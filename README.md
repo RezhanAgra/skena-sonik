@@ -1,6 +1,6 @@
 # Skena Sonik Tour 2026
 
-Mockup web tur konser bergaya poster merah-hitam. Tidak butuh build tool: buka `index.html` lewat Live Server di VS Code, atau langsung di browser.
+Mockup web tour konser bergaya poster merah-hitam. Tidak butuh build tool: buka `index.html` lewat Live Server di VS Code, atau langsung di browser.
 
 ## Struktur
 
