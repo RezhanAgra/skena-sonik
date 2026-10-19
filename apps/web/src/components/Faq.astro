@@ -1,0 +1,29 @@
+---
+import SectionHead from './SectionHead.astro';
+
+const faqs = [
+  ['Umur minimal berapa?', '16 tahun ke atas. Di bawah 16 tahun boleh masuk kalau didampingi orang tua atau wali yang juga punya tiket.'],
+  ['Boleh bawa powerbank?', 'Boleh, maksimal 20.000 mAh. Ada stasiun charging gratis di dekat area makanan.'],
+  ['Bisa refund?', 'Tiket tidak bisa direfund kecuali acara dibatalkan. Kamu bisa pindah nama sekali, gratis, sampai H-7.'],
+  ['Bayar di dalam pakai apa?', 'Seluruh area cashless. Isi saldo gelang lewat QRIS atau di booth top-up. Sisa saldo bisa ditarik setelah acara.'],
+  ['Ada fasilitas buat yang butuh jeda?', 'Ada ruang tenang tanpa musik, 12 titik air isi ulang gratis, tim zona aman berompi merah, dan platform kursi roda di setiap panggung.']
+];
+---
+
+<section id="faq" class="pb-[clamp(56px,8vw,100px)]">
+  <div class="wrap">
+    <SectionHead eyebrow="FAQ" title="Yang sering ditanyain" />
+    <div class="mx-auto grid max-w-[820px] gap-2.5">
+      {faqs.map(([q, a], i) => (
+        <details open={i === 0} class="group card rounded-xl px-5 py-4">
+          <summary class="flex cursor-pointer list-none justify-between gap-4 font-extrabold [&::-webkit-details-marker]:hidden">
+            {q}
+            <span class="text-[1.4rem] leading-none font-black text-flare group-open:hidden">+</span>
+            <span class="hidden text-[1.4rem] leading-none font-black text-flare group-open:inline">–</span>
+          </summary>
+          <p class="mt-2.5 mb-0 text-muted">{a}</p>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>

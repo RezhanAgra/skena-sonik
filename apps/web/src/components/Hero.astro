@@ -1,0 +1,44 @@
+---
+// Hero panggung berasap dengan dua pita "garis polisi" yang teksnya berjalan
+const tapes = [
+  ['Daftar biar nggak ketinggalan', 'Skena Sonik Tour', 'Presale Jakarta dibuka', 'Sejarah baru skena'],
+  ['Presale Bali segera', 'Skena Sonik Tour', 'Daftar biar nggak ketinggalan', 'Grand finale 12–13 Des']
+];
+// teks diulang 4× supaya animasi geser -50% tidak pernah kosong
+const repeated = (words: string[]) => Array.from({ length: 4 }, () => words).flat();
+---
+
+<section id="top" class="relative isolate -mt-[86px] overflow-hidden pt-[130px]">
+  <div class="smoke absolute inset-0 -z-10" aria-hidden="true"></div>
+
+  <div class="wrap relative z-[3] grid justify-items-center gap-4.5 text-center">
+    <span class="eyebrow text-[#ffd0d0]">6 kota · grand finale Jakarta 12–13 Des</span>
+    <h1 class="text-[clamp(1.6rem,4.2vw,2.8rem)] [text-shadow:0_2px_20px_rgb(0_0_0/0.6)]">Presale Jakarta sudah dibuka</h1>
+    <p class="m-0 max-w-[52ch] font-medium text-[#ffd9d9]">
+      Tur Skena Sonik keliling Indonesia, ditutup festival 2 hari dengan 12 penampil: pop punk, indie, rap, dan reggae.
+    </p>
+    <a class="btn btn-white" href="#tiket">Amankan tiketmu</a>
+  </div>
+
+  <div class="relative mt-2.5 h-[clamp(340px,52vw,560px)]" aria-hidden="true">
+    {tapes.map((words, i) => (
+      <div
+        class:list={[
+          'absolute -left-[10%] z-[2] w-[120%] overflow-hidden border-y-2 border-[#b00000] bg-flare text-white shadow-[0_6px_30px_rgb(0_0_0/0.6)]',
+          i === 0 ? 'top-[30%] rotate-12' : 'top-[48%] -rotate-9'
+        ]}
+      >
+        <div class:list={['flex w-max animate-marquee py-2.5', i === 1 && '[animation-direction:reverse]']}>
+          {repeated(words).map(w => (
+            <span class="whitespace-nowrap pr-15 text-[clamp(0.8rem,1.5vw,1.05rem)] font-black uppercase tracking-wide">{w}</span>
+          ))}
+        </div>
+      </div>
+    ))}
+
+    <div class="absolute bottom-[13%] left-1/2 z-[1] h-[88%] -translate-x-1/2 drop-shadow-[0_0_30px_rgb(255_90_60/0.6)]">
+      <svg viewBox="0 0 200 420" class="block h-full w-auto"><use href="#sil-fist" fill="#050505" /></svg>
+    </div>
+    <div class="platform-lights absolute inset-x-0 bottom-0 z-[1] h-[15%] border-t-2 border-[rgb(255_120_100/0.5)] bg-linear-to-b from-[#2a0000] to-ink"></div>
+  </div>
+</section>

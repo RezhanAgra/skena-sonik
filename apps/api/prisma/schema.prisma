@@ -1,0 +1,114 @@
+// Skema database Skena Sonik Tour 2026
+// Jalankan `npm run db:migrate` setelah mengubah file ini.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CityStatus {
+  SOLD_OUT
+  LOW
+  ON_SALE
+  SOON
+}
+
+/// Kota yang disinggahi tur
+model City {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique @db.VarChar(3)
+  name      String
+  dateLabel String
+  status    CityStatus
+  sortOrder Int        @default(0)
+}
+
+/// Panggung di grand finale Jakarta
+model Stage {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique
+  sortOrder    Int           @default(0)
+  performances Performance[]
+}
+
+/// Genre lineup, sekaligus persona hasil vibe check
+model Genre {
+  slug         String   @id
+  label        String
+  bio          String
+  personaName  String
+  personaStage String
+  personaDesc  String
+  sortOrder    Int      @default(0)
+  artists      Artist[]
+}
+
+model Artist {
+  slug        String       @id
+  name        String
+  headliner   Boolean      @default(false)
+  genreSlug   String
+  genre       Genre        @relation(fields: [genreSlug], references: [slug])
+  performance Performance?
+  songs       Song[]
+}
+
+/// Jadwal tampil: satu artis tampil sekali. Jam disimpan sebagai menit sejak 00:00.
+model Performance {
+  id          Int    @id @default(autoincrement())
+  artistSlug  String @unique
+  artist      Artist @relation(fields: [artistSlug], references: [slug], onDelete: Cascade)
+  stageId     Int
+  stage       Stage  @relation(fields: [stageId], references: [id])
+  day         Int // 1 = Sabtu 12 Des, 2 = Minggu 13 Des
+  startMinute Int
+  endMinute   Int
+
+  @@index([day, stageId])
+}
+
+/// Lagu yang tampil di slider "Dengerin dulu sebelum nonton"
+model Song {
+  id         Int    @id @default(autoincrement())
+  title      String
+  artistSlug String
+  artist     Artist @relation(fields: [artistSlug], references: [slug], onDelete: Cascade)
+  speed      Float  @default(1) // tempo animasi layar LED
+  sortOrder  Int    @default(0)
+}
+
+model TicketTier {
+  slug       String   @id
+  name       String
+  price      Int // rupiah per orang
+  perks      String[]
+  badge      String?
+  soldOut    Boolean  @default(false)
+  squadPrice Int? // harga per orang kalau beli >= squadMin
+  squadMin   Int?
+  sortOrder  Int      @default(0)
+  orders     Order[]
+}
+
+model Subscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+/// Order demo: harga dihitung ulang di server, tidak ada pembayaran sungguhan
+model Order {
+  id          Int        @id @default(autoincrement())
+  tierSlug    String
+  tier        TicketTier @relation(fields: [tierSlug], references: [slug])
+  quantity    Int
+  installment Boolean    @default(false)
+  unitPrice   Int
+  fee         Int
+  total       Int
+  createdAt   DateTime   @default(now())
+}

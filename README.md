@@ -1,35 +1,94 @@
 # Skena Sonik Tour 2026
 
-Mockup web tour konser bergaya poster merah-hitam. Tidak butuh build tool: buka `index.html` lewat Live Server di VS Code, atau langsung di browser.
+Web tur konser bergaya poster merah-hitam, dibangun dengan **Astro + React + Tailwind CSS** di frontend dan **Express + Prisma + PostgreSQL** di backend (PERN).
+
+> Mockup desain: acara, harga, kota, dan tanggal fiktif. Nama musisi hanya contoh lineup.
 
 ## Struktur
 
 ```
-index.html          markup halaman
-css/
-  base.css          token warna & font, reset, tipografi, tombol
-  layout.css        header, hero, kartu kota, slider lagu, kartu about
-  sections.css      lineup, jadwal, vibe check, tiket, signup, FAQ, footer
-js/
-  utils.js          helper ($, localStorage aman, format rupiah)
-  data.js           SEMUA konten: kota, lineup, jadwal, lagu, persona, harga
-  saved.js          daftar set pilihan pengunjung (dipakai lineup & jadwal)
-  hero.js           pita berjalan, kartu kota, hitung mundur
-  slider.js         slider 3 lagu + animasi layar LED
-  lineup.js         kartu musisi + filter genre
-  schedule.js       clash finder & panel "Jadwalmu"
-  vibe.js           kuis vibe check & kartu akses
-  tickets.js        pilihan tiket, kalkulator patungan, keranjang
-  signup.js         form daftar info presale
-  main.js           menjalankan semua fitur
+apps/
+  api/                    Express 5 + Prisma 7 (PostgreSQL)
+    prisma/
+      schema.prisma       model: City, Stage, Genre, Artist, Performance, Song, TicketTier, Subscriber, Order
+      seed.ts             konten awal (kota, lineup, jadwal, lagu, tiket)
+      migrations/         riwayat migrasi database
+    src/
+      server.ts           titik masuk, baca PORT
+      app.ts              middleware, routing, error handler
+      db.ts               Prisma Client (driver adapter pg)
+      lib/pricing.ts      satu-satunya tempat harga tiket dihitung
+      routes/             festival, tickets + orders, subscribers
+  web/                    Astro 6 (SSR, adapter Node) + React 19 + Tailwind 4
+    src/
+      pages/index.astro   halaman utama, ambil data dari API tiap request
+      layouts/            <head>, font, global.css
+      components/         *.astro = statis, *.tsx = island interaktif
+      stores/             state bersama antar island (nanostores)
+      lib/                api client, tipe data, format rupiah, path SVG
+      styles/global.css   token warna/font Tailwind (@theme) + komponen kecil
 ```
+
+## Menjalankan
+
+Butuh **Node.js 22.12+** dan database **PostgreSQL**.
+
+```bash
+npm install
+```
+
+Salin contoh env lalu isi `DATABASE_URL` dengan koneksi PostgreSQL-mu:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
+
+```bash
+cp apps/web/.env.example apps/web/.env
+```
+
+Buat tabel dan isi konten awal:
+
+```bash
+npm run db:migrate
+```
+
+```bash
+npm run db:seed
+```
+
+Jalankan API (port 4000) dan web (port 4321) sekaligus:
+
+```bash
+npm run dev
+```
+
+Buka http://localhost:4321.
+
+## API
+
+| Method | Endpoint | Fungsi |
+| --- | --- | --- |
+| GET | `/api/health` | cek API & koneksi database |
+| GET | `/api/festival` | semua konten halaman (kota, panggung, genre, artis + jadwal, lagu, tiket) |
+| POST | `/api/tickets/quote` | hitung harga `{ tier, quantity, installment }` |
+| POST | `/api/orders` | simpan order demo (harga dihitung ulang di server) |
+| POST | `/api/subscribers` | daftar info presale `{ email }` |
 
 ## Mengubah konten
 
-Hampir semua teks yang sering diganti ada di `js/data.js`: daftar musisi (`ARTISTS`), jam tampil (`SETS`), lagu di slider (`SONGS`), kota tur (`CITIES`), dan harga tiket (`TICKETS`).
+Konten ada di database. Ubah lewat `apps/api/prisma/seed.ts` lalu jalankan `npm run db:seed`, atau edit langsung di Prisma Studio:
 
-## Catatan
+```bash
+npm run db:studio
+```
 
-- Urutan `<script>` di `index.html` penting: `utils` → `data` → `saved` → fitur → `main`.
-- Jangan hapus tag penutup `</body>`. Tanpa tag itu, Live Server menyisipkan script auto-reload di setiap `</svg>` dan halaman terpotong.
-- Ini mockup: acara, harga, dan tanggal fiktif. Nama musisi hanya contoh lineup.
+## Skrip
+
+| Skrip | Fungsi |
+| --- | --- |
+| `npm run dev` | API + web dalam mode dev |
+| `npm run build` | generate Prisma Client + build Astro |
+| `npm run db:migrate` | buat/terapkan migrasi dari `schema.prisma` |
+| `npm run db:seed` | isi ulang konten (subscriber & order tidak dihapus) |
+| `npm run db:studio` | buka Prisma Studio |

@@ -1,0 +1,10 @@
+---
+interface Props { eyebrow: string; title: string; lede?: string }
+const { eyebrow, title, lede } = Astro.props;
+---
+
+<div class="mb-8.5 grid justify-items-center gap-3 text-center">
+  <span class="eyebrow">{eyebrow}</span>
+  <h2 class="text-[clamp(1.8rem,4.4vw,3rem)]">{title}</h2>
+  {lede && <p class="lede mx-auto">{lede}</p>}
+</div>
