@@ -1,0 +1,24 @@
+---
+import Countdown from './Countdown.tsx';
+
+interface Props { startsAt: string }
+const { startsAt } = Astro.props;
+---
+
+<section class="pb-[clamp(56px,8vw,100px)]">
+  <div class="wrap">
+    <div class="grid overflow-hidden rounded-[18px] border border-flare/35 bg-panel shadow-[0_0_60px_rgb(255_31_31/0.25)] md:grid-cols-[1fr_1.3fr]">
+      <div class="relative min-h-60 bg-[radial-gradient(circle_at_60%_90%,#ff2a1a,#5a0000_50%,#0a0000_80%)] md:min-h-75" aria-hidden="true">
+        <svg viewBox="0 0 260 420" class="absolute bottom-0 left-1/2 h-[92%] w-auto -translate-x-1/2 fill-ink"><use href="#sil-point" /></svg>
+      </div>
+      <div class="grid min-w-0 content-center gap-4.5 p-[clamp(22px,4vw,40px)]">
+        <span class="logo-type text-[clamp(3rem,7vw,5.4rem)]">Skena<br />Sonik</span>
+        <p class="m-0 max-w-[48ch] text-[1.05rem] font-bold">
+          Energi mentah, suara yang bikin merinding, dan ribuan orang yang hafal lirik yang sama. Enam kota, satu tur,
+          dan grand finale yang belum pernah ada di Jakarta.
+        </p>
+        <Countdown client:load startsAt={startsAt} />
+      </div>
+    </div>
+  </div>
+</section>

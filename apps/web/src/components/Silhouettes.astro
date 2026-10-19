@@ -1,0 +1,11 @@
+---
+// Definisi siluet penampil, dipakai ulang lewat <use href="#sil-fist"> / <use href="#sil-point">
+import { SILHOUETTE_FIST, SILHOUETTE_POINT } from '../lib/silhouettes';
+---
+
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <defs>
+    <symbol id="sil-fist" viewBox="0 0 200 420"><path d={SILHOUETTE_FIST} /></symbol>
+    <symbol id="sil-point" viewBox="0 0 260 420"><path d={SILHOUETTE_POINT} /></symbol>
+  </defs>
+</svg>

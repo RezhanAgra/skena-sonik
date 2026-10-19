@@ -1,0 +1,44 @@
+---
+import type { City } from '../lib/types';
+import { SKYLINE } from '../lib/silhouettes';
+
+interface Props { cities: City[] }
+const { cities } = Astro.props;
+
+const LABEL = { sold: 'Sold out', low: 'Sisa sedikit', live: 'Beli tiket', soon: 'Segera' } as const;
+const statusClass = 'mt-auto block rounded-md border px-2 py-2.5 text-center text-[0.68rem] font-extrabold uppercase leading-none tracking-wide no-underline';
+---
+
+<div id="tur" class="relative z-[4] -mt-10">
+  <div class="wrap">
+    <div class="grid snap-x snap-mandatory auto-cols-[minmax(250px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2">
+      {cities.map(c => (
+        <article
+          class:list={[
+            'card grid snap-start grid-cols-[96px_1fr] gap-3 rounded-[14px] p-2.5',
+            c.status === 'live' && 'border-flare/60 shadow-[0_0_30px_rgb(255_31_31/0.2)]'
+          ]}
+        >
+          <div
+            class="relative grid aspect-[1/1.2] place-items-end justify-center overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_30%,#ff4a3a,#8a0000_60%,#200000)] pb-2"
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 140 120" preserveAspectRatio="none" class="absolute inset-x-0 bottom-0 h-[70%] w-full fill-black/75">
+              <path d={SKYLINE[c.code]} />
+            </svg>
+            <b class="relative font-mono text-[0.7rem] tracking-widest">{c.code}</b>
+          </div>
+          <div class="grid min-w-0 content-start gap-1">
+            <span class="text-[1.05rem] leading-tight font-extrabold">{c.name}</span>
+            <span class="text-[0.8rem] text-muted">{c.dateLabel}</span>
+            {c.status === 'live' ? (
+              <a href="#tiket" class:list={[statusClass, 'border-flare bg-flare text-white shadow-glow']}>{LABEL[c.status]}</a>
+            ) : (
+              <span class:list={[statusClass, c.status === 'low' ? 'border-flare text-flare' : 'border-line text-muted']}>{LABEL[c.status]}</span>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</div>

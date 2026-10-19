@@ -1,0 +1,101 @@
+---
+// Halaman utama. Data diambil dari API Express setiap request (SSR),
+// bagian interaktif di-hydrate sebagai island React.
+import Layout from '../layouts/Layout.astro';
+import Silhouettes from '../components/Silhouettes.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import Cities from '../components/Cities.astro';
+import About from '../components/About.astro';
+import SectionHead from '../components/SectionHead.astro';
+import Faq from '../components/Faq.astro';
+import Footer from '../components/Footer.astro';
+import SongSlider from '../components/SongSlider.tsx';
+import Lineup from '../components/Lineup.tsx';
+import Schedule from '../components/Schedule.tsx';
+import VibeCheck from '../components/VibeCheck.tsx';
+import Tickets from '../components/Tickets.tsx';
+import Signup from '../components/Signup.tsx';
+import { api } from '../lib/api';
+import type { Festival } from '../lib/types';
+
+let festival: Festival | null = null;
+let error = '';
+try {
+  festival = await api.festival();
+} catch (err) {
+  error = (err as Error).message;
+  Astro.response.status = 503;
+}
+
+const section = 'py-[clamp(56px,8vw,100px)]';
+const redBand = 'bg-linear-to-b from-ink via-[#0c0000] to-ink';
+---
+
+<Layout>
+  <Silhouettes />
+  <Header />
+  <Hero />
+
+  {festival ? (
+    <>
+      <Cities cities={festival.cities} />
+
+      <section class="bg-linear-to-b from-ink via-[#0d0000] to-ink py-[clamp(40px,6vw,70px)]" aria-label="Lagu dari lineup">
+        <div class="wrap">
+          <SectionHead eyebrow="Pemanasan" title="Dengerin dulu sebelum nonton" />
+          <SongSlider client:visible songs={festival.songs} genres={festival.genres} />
+        </div>
+      </section>
+
+      <About startsAt={festival.event.startsAt} />
+
+      <main>
+        <section id="lineup" class="pt-5 pb-[clamp(56px,8vw,100px)]">
+          <div class="wrap">
+            <SectionHead eyebrow="Grand finale · Jakarta" title="Lineup" lede="Filter berdasarkan genre, lalu tekan “+ Jadwal” buat nyimpen set ke jadwal pribadimu." />
+            <Lineup client:visible artists={festival.artists} genres={festival.genres} days={festival.event.days} />
+          </div>
+        </section>
+
+        <section id="jadwal" class:list={[section, redBand]}>
+          <div class="wrap">
+            <SectionHead eyebrow="Clash finder" title="Rakit jadwalmu" lede="Pilih set yang mau kamu tonton. Yang jamnya tabrakan langsung ditandai merah." />
+            <Schedule client:visible artists={festival.artists} stages={festival.stages} days={festival.event.days} />
+          </div>
+        </section>
+
+        <section id="vibe" class={section}>
+          <div class="wrap">
+            <SectionHead eyebrow="Vibe check · 3 pertanyaan" title="Kamu tipe penonton yang mana?" lede="Hasilnya jadi kartu akses virtual yang bisa kamu screenshot buat story." />
+            <VibeCheck client:visible genres={festival.genres} artists={festival.artists} />
+          </div>
+        </section>
+
+        <section id="tiket" class:list={[section, 'bg-linear-to-b from-ink via-[#120000] to-ink']}>
+          <div class="wrap">
+            <SectionHead eyebrow="Tiket grand finale" title="Pilih tiket, ajak squad" lede="Beli 2-Day Pass untuk 4 orang atau lebih dan harga per orang otomatis turun." />
+            <Tickets client:visible tiers={festival.tiers} pricing={festival.pricing} />
+          </div>
+        </section>
+
+        <section class:list={[section, 'text-center']}>
+          <div class="wrap">
+            <h2 class="mx-auto max-w-[20ch] text-[clamp(1.8rem,4.4vw,3rem)]">Daftar buat info presale kota berikutnya</h2>
+            <p class="lede mx-auto mt-3.5">Jadi yang pertama tahu kapan tiket Bali dibuka. Kami kirim kabar sebelum diumumkan ke publik.</p>
+            <Signup client:load />
+          </div>
+        </section>
+
+        <Faq />
+      </main>
+    </>
+  ) : (
+    <main class="wrap py-24 text-center">
+      <h2 class="text-3xl">Konten belum bisa dimuat</h2>
+      <p class="lede mx-auto mt-4">{error}</p>
+    </main>
+  )}
+
+  <Footer />
+</Layout>
