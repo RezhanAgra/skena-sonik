@@ -1,0 +1,37 @@
+---
+// Halaman status pesanan. Midtrans mengarahkan pembeli ke sini setelah bayar (callbacks.finish).
+import Layout from '../../layouts/Layout.astro';
+import OrderStatus from '../../components/OrderStatus.tsx';
+import { API_URL } from 'astro:env/server';
+import { ApiError, createApi } from '../../lib/api';
+import type { OrderView } from '../../lib/types';
+
+const code = (Astro.params.code ?? '').toUpperCase();
+let order: OrderView | null = null;
+let error = '';
+try {
+  order = await createApi(API_URL).order(code);
+} catch (err) {
+  error = err instanceof ApiError ? err.message : 'Pesanan tidak bisa dimuat.';
+  Astro.response.status = /tidak ditemukan/i.test(error) ? 404 : 503;
+}
+// halaman pesanan berisi data pribadi: jangan di-cache dan jangan diindeks
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<Layout title={`Pesanan ${code} · Skena Sonik`} noindex>
+  <main class="smoke relative min-h-dvh overflow-hidden">
+    <div class="wrap relative z-10 grid gap-6 py-10 sm:py-16">
+      <a href="/" class="logo-type justify-self-center text-4xl no-underline">Skena Sonik</a>
+      {order ? (
+        <OrderStatus client:load initial={order} />
+      ) : (
+        <div class="card mx-auto grid max-w-[520px] justify-items-center gap-4 rounded-[18px] p-8 text-center">
+          <h1 class="text-2xl">Pesanan tidak ditemukan</h1>
+          <p class="lede">{error} Periksa lagi kode pesanan <b class="text-paper">{code}</b>.</p>
+          <a class="btn btn-white" href="/">Kembali ke beranda</a>
+        </div>
+      )}
+    </div>
+  </main>
+</Layout>

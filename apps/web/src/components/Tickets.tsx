@@ -1,10 +1,10 @@
 // Pilihan tiket + kalkulator patungan. Harga dihitung oleh API (/api/tickets/quote),
-// order disimpan lewat /api/orders.
+// tombol "Masukkan ke keranjang" menambah tiket ke keranjang (checkout & bayar ada di CartDrawer).
 import { useEffect, useState } from 'react';
 import type { Pricing, Quote, Tier } from '../lib/types';
 import { api } from '../lib/api';
 import { rupiah } from '../lib/format';
-import { addToCart } from '../stores/cart';
+import { MAX_TICKETS, addToCart, openCart } from '../stores/cart';
 
 const shortPrice = (n: number) => (n >= 1_000_000 ? `Rp${(n / 1_000_000).toLocaleString('id-ID')}jt` : `Rp${n / 1000}rb`);
 
@@ -15,7 +15,6 @@ export default function Tickets({ tiers, pricing }: { tiers: Tier[]; pricing: Pr
   const [installment, setInstallment] = useState(true);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!tier) return;
@@ -27,17 +26,16 @@ export default function Tickets({ tiers, pricing }: { tiers: Tier[]; pricing: Pr
     return () => { cancelled = true; };
   }, [tier, quantity, installment]);
 
-  const checkout = async () => {
-    setBusy(true);
-    try {
-      const order = await api.order({ tier, quantity, installment });
-      addToCart(order.quantity);
-      setMessage(`Order #${order.id} tersimpan: ${order.quantity} tiket ${order.tierName}. Ini demo, belum ada pembayaran sungguhan.`);
-    } catch (err) {
-      setMessage((err as Error).message);
-    } finally {
-      setBusy(false);
+  const addSelected = () => {
+    const added = addToCart(tier, quantity);
+    if (!added) {
+      setMessage(`Keranjang sudah penuh (maksimal ${MAX_TICKETS} tiket per pesanan).`);
+      return;
     }
+    setMessage(added < quantity
+      ? `Hanya ${added} tiket yang masuk karena batas ${MAX_TICKETS} tiket per pesanan.`
+      : `${added} tiket ${quote?.tierName ?? ''} masuk keranjang.`);
+    openCart();
   };
 
   const squadNote = quote?.squadDeal
@@ -100,7 +98,7 @@ export default function Tickets({ tiers, pricing }: { tiers: Tier[]; pricing: Pr
           </div>
           <label className="flex cursor-pointer items-center gap-2.5 font-semibold">
             <input type="checkbox" checked={installment} onChange={e => setInstallment(e.target.checked)} className="size-4.5 accent-flare" />
-            Bayar cicil {pricing.installments}× tanpa bunga
+            Hitung patungan per bulan ({pricing.installments}×)
           </label>
         </div>
 
@@ -127,14 +125,14 @@ export default function Tickets({ tiers, pricing }: { tiers: Tier[]; pricing: Pr
                 </b>
               </div>
               <span className="text-sm text-muted">
-                {installment ? `Total per orang ${rupiah(quote.perPerson)}, dibagi ${pricing.installments} bulan tanpa bunga.` : 'Dibayar sekali di muka.'}
+                {installment ? `Total per orang ${rupiah(quote.perPerson)}, kalau patungannya dicicil ${pricing.installments} bulan ke teman yang bayar. Checkout tetap dibayar lunas.` : 'Checkout dibayar lunas sekali bayar.'}
               </span>
             </>
           ) : (
             <span className="text-sm text-muted">Menghitung harga…</span>
           )}
-          <button type="button" className="btn btn-red justify-self-start" onClick={checkout} disabled={busy || !quote}>
-            {busy ? 'Menyimpan…' : 'Masukkan ke keranjang'}
+          <button type="button" className="btn btn-red justify-self-start" onClick={addSelected} disabled={!quote}>
+            Masukkan ke keranjang
           </button>
           <p className="m-0 min-h-[1.3em] text-sm text-[#ffb3b3]" aria-live="polite">{message}</p>
         </div>

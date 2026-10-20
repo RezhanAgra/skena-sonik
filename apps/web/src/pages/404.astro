@@ -1,0 +1,19 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Silhouettes from '../components/Silhouettes.astro';
+---
+
+<Layout title="Halaman tidak ditemukan · Skena Sonik" noindex>
+  <Silhouettes />
+  <main class="smoke relative grid min-h-dvh place-items-center overflow-hidden px-4 text-center">
+    <div class="relative z-10 grid justify-items-center gap-5">
+      <span class="logo-type text-[clamp(5rem,18vw,11rem)]">404</span>
+      <h1 class="text-[clamp(1.5rem,4vw,2.4rem)]">Panggungnya nggak ketemu</h1>
+      <p class="lede">Halaman yang kamu cari tidak ada atau sudah dipindah. Balik ke halaman utama buat lihat lineup dan tiket.</p>
+      <a class="btn btn-white" href="/">Kembali ke beranda</a>
+    </div>
+    <svg viewBox="0 0 200 420" class="absolute bottom-0 left-1/2 h-[45%] w-auto -translate-x-1/2 fill-ink opacity-80" aria-hidden="true">
+      <use href="#sil-fist" />
+    </svg>
+  </main>
+</Layout>
