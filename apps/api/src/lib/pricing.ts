@@ -45,3 +45,42 @@ export function quote(tier: TicketTier, quantity: number, installment: boolean) 
 }
 
 export type Quote = ReturnType<typeof quote>;
+
+export type CartItemInput = { tier: string; quantity: number };
+
+// Harga keranjang berisi beberapa jenis tiket. Harga squad dihitung per jenis tiket,
+// batas jumlah berlaku untuk total tiket dalam satu pesanan.
+export function quoteCart(items: CartItemInput[], tiers: TicketTier[]) {
+  if (!items.length) throw new PricingError('Keranjang masih kosong.');
+  const bySlug = new Map(tiers.map(t => [t.slug, t]));
+
+  // gabungkan baris dengan tier yang sama
+  const merged = new Map<string, number>();
+  for (const item of items) merged.set(item.tier, (merged.get(item.tier) ?? 0) + item.quantity);
+
+  const totalQuantity = [...merged.values()].reduce((a, b) => a + b, 0);
+  if (totalQuantity > PRICING.maxQuantity) {
+    throw new PricingError(`Maksimal ${PRICING.maxQuantity} tiket per pesanan.`);
+  }
+
+  const lines = [...merged].map(([slug, quantity]) => {
+    const tier = bySlug.get(slug);
+    if (!tier) throw new PricingError('Jenis tiket tidak ditemukan.', 404);
+    const q = quote(tier, quantity, false);
+    return {
+      tier: tier.slug,
+      tierName: tier.name,
+      quantity,
+      unitPrice: q.unitPrice,
+      subtotal: q.subtotal,
+      squadDeal: q.squadDeal,
+      squadNeeded: q.squadNeeded
+    };
+  });
+
+  const subtotal = lines.reduce((sum, l) => sum + l.subtotal, 0);
+  const fee = PRICING.feePerTicket * totalQuantity;
+  return { lines, totalQuantity, subtotal, fee, total: subtotal + fee };
+}
+
+export type CartQuote = ReturnType<typeof quoteCart>;

@@ -10,7 +10,9 @@
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
     "db:studio": "npm run db:studio -w api",
-    "check": "npm run check -w web"
+    "start": "concurrently -n api,web -c red,white \"npm run start -w api\" \"npm run start -w web\"",
+    "typecheck": "npm run typecheck -w api && npm run check -w web",
+    "db:deploy": "npm run db:deploy -w api"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

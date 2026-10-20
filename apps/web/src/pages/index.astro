@@ -16,13 +16,15 @@ import Schedule from '../components/Schedule.tsx';
 import VibeCheck from '../components/VibeCheck.tsx';
 import Tickets from '../components/Tickets.tsx';
 import Signup from '../components/Signup.tsx';
-import { api } from '../lib/api';
+import CartDrawer from '../components/CartDrawer.tsx';
+import { API_URL } from 'astro:env/server';
+import { createApi } from '../lib/api';
 import type { Festival } from '../lib/types';
 
 let festival: Festival | null = null;
 let error = '';
 try {
-  festival = await api.festival();
+  festival = await createApi(API_URL).festival();
 } catch (err) {
   error = (err as Error).message;
   Astro.response.status = 503;
@@ -39,6 +41,7 @@ const redBand = 'bg-linear-to-b from-ink via-[#0c0000] to-ink';
 
   {festival ? (
     <>
+      <CartDrawer client:load tiers={festival.tiers} />
       <Cities cities={festival.cities} />
 
       <section class="bg-linear-to-b from-ink via-[#0d0000] to-ink py-[clamp(40px,6vw,70px)]" aria-label="Lagu dari lineup">

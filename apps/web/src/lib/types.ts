@@ -59,3 +59,48 @@ export interface Quote {
   savings: number;
   squadNeeded: number | null;
 }
+
+/* ---------- keranjang & pesanan ---------- */
+
+export interface CartItem { tier: string; quantity: number }
+
+export interface CartLine {
+  tier: string;
+  tierName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  squadDeal: boolean;
+  squadNeeded: number | null;
+}
+
+export interface CartQuote { lines: CartLine[]; totalQuantity: number; subtotal: number; fee: number; total: number }
+
+export interface Buyer { name: string; email: string; phone: string }
+
+export interface CheckoutResult {
+  code: string;
+  total: number;
+  provider: 'midtrans' | 'mock';
+  token: string | null;
+  redirectUrl: string;
+  snap: { clientKey: string; scriptUrl: string } | null;
+}
+
+export type OrderStatus = 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED' | 'REFUNDED';
+
+export interface OrderView {
+  code: string;
+  status: OrderStatus;
+  buyerName: string;
+  buyerEmail: string;
+  items: { tier: string; tierName: string; quantity: number; unitPrice: number; subtotal: number }[];
+  subtotal: number;
+  fee: number;
+  total: number;
+  paymentProvider: string;
+  paymentType: string | null;
+  paymentUrl: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}

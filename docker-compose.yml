@@ -1,0 +1,68 @@
+# Deploy produksi di VPS: Caddy (HTTPS otomatis) → web (Astro SSR) + api (Express) → Supabase
+# Isi variabel di file .env (salin dari .env.example), lalu: docker compose up -d --build
+
+services:
+  # Menerapkan migrasi Prisma ke database, lalu selesai. API baru start setelah ini sukses.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?isi DATABASE_URL di .env}
+      DIRECT_URL: ${DIRECT_URL:?isi DIRECT_URL di .env}
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: 4000
+      TRUST_PROXY: 1
+      SITE_URL: https://${DOMAIN}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-midtrans}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        SITE_URL: https://${DOMAIN:?isi DOMAIN di .env}
+    environment:
+      API_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?isi ACME_EMAIL di .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -82,16 +82,16 @@ model Song {
 }
 
 model TicketTier {
-  slug       String   @id
+  slug       String      @id
   name       String
   price      Int // rupiah per orang
   perks      String[]
   badge      String?
-  soldOut    Boolean  @default(false)
+  soldOut    Boolean     @default(false)
   squadPrice Int? // harga per orang kalau beli >= squadMin
   squadMin   Int?
-  sortOrder  Int      @default(0)
-  orders     Order[]
+  sortOrder  Int         @default(0)
+  orderItems OrderItem[]
 }
 
 model Subscriber {
@@ -100,15 +100,49 @@ model Subscriber {
   createdAt DateTime @default(now())
 }
 
-/// Order demo: harga dihitung ulang di server, tidak ada pembayaran sungguhan
+enum OrderStatus {
+  PENDING // menunggu pembayaran
+  PAID // lunas
+  FAILED // ditolak / gagal
+  EXPIRED // tidak dibayar sampai batas waktu
+  CANCELLED // dibatalkan
+  REFUNDED // dana dikembalikan
+}
+
+/// Pesanan tiket. `code` dipakai sebagai order_id di payment gateway dan di URL /pesanan/[code].
 model Order {
-  id          Int        @id @default(autoincrement())
-  tierSlug    String
-  tier        TicketTier @relation(fields: [tierSlug], references: [slug])
-  quantity    Int
-  installment Boolean    @default(false)
-  unitPrice   Int
-  fee         Int
-  total       Int
-  createdAt   DateTime   @default(now())
+  id              Int         @id @default(autoincrement())
+  code            String      @unique
+  status          OrderStatus @default(PENDING)
+  buyerName       String
+  buyerEmail      String
+  buyerPhone      String
+  subtotal        Int
+  fee             Int
+  total           Int
+  paymentProvider String // midtrans | mock
+  paymentToken    String?
+  paymentUrl      String?
+  paymentType     String? // qris, gopay, bank_transfer, credit_card, dll.
+  paidAt          DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+
+  @@index([status])
+}
+
+/// Baris tiket di dalam pesanan. Harga disalin saat checkout supaya tidak berubah kalau harga tier diubah.
+model OrderItem {
+  id        Int        @id @default(autoincrement())
+  orderId   Int
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tierSlug  String
+  tier      TicketTier @relation(fields: [tierSlug], references: [slug])
+  tierName  String
+  quantity  Int
+  unitPrice Int
+  subtotal  Int
+
+  @@index([orderId])
 }

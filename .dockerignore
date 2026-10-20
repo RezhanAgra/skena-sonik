@@ -1,0 +1,11 @@
+.git
+.github
+**/node_modules
+**/dist
+**/.astro
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/src/generated
+**/.DS_Store
+**/.vscode

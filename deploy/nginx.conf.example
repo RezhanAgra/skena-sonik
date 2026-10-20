@@ -1,0 +1,39 @@
+# Alternatif kalau VPS-mu sudah memakai Nginx (bukan Caddy dari docker-compose).
+# 1. Di docker-compose.yml, hapus service `caddy` lalu tambahkan port ke api & web:
+#      api:  ports: ["127.0.0.1:4000:4000"]
+#      web:  ports: ["127.0.0.1:4321:4321"]
+# 2. Salin file ini ke /etc/nginx/sites-available/skena-sonik, ganti domainmu.com, lalu aktifkan.
+# 3. Pasang HTTPS:  sudo certbot --nginx -d domainmu.com -d www.domainmu.com
+
+server {
+    listen 80;
+    server_name domainmu.com www.domainmu.com;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /_astro/ {
+        proxy_pass http://127.0.0.1:4321;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:4321;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
