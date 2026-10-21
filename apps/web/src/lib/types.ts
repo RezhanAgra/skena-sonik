@@ -103,4 +103,42 @@ export interface OrderView {
   paymentUrl: string | null;
   paidAt: string | null;
   createdAt: string;
+  ticketsEmailedAt: string | null;
+  ticketsEmailFailed: boolean;
+  tickets: ETicket[];
 }
+
+export interface ETicket {
+  code: string;
+  tierName: string;
+  holderName: string;
+  seq: number;
+  access: string;
+  checkIns: { day: number; at: string }[];
+  /** SVG QR dari API (tepercaya, dibuat server) */
+  qrSvg: string;
+}
+
+/* ---------- gerbang ---------- */
+
+export interface GateInfo { ok: true; event: string; today: number | null; days: { day: number; label: string }[] }
+
+export interface GateTicket {
+  code: string;
+  tierName: string;
+  holderName: string;
+  seq: number;
+  totalInOrder: number;
+  orderCode: string;
+  daysAccess: number;
+  checkIns: { day: number; at: string; gate: string | null }[];
+}
+
+export interface CheckInResult {
+  result: 'ok' | 'used' | 'wrong_day' | 'invalid';
+  day: number;
+  ticket?: GateTicket;
+  message: string;
+}
+
+export interface GateStats { issued: number; checkedIn: { day: number; count: number }[] }

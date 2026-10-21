@@ -11,6 +11,7 @@ import { festivalRouter } from './routes/festival.ts';
 import { ticketsRouter } from './routes/tickets.ts';
 import { cartRouter, checkoutRouter, ordersRouter, paymentsRouter } from './routes/checkout.ts';
 import { subscribersRouter } from './routes/subscribers.ts';
+import { gateRouter } from './routes/gate.ts';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -55,6 +56,8 @@ app.use('/api/orders', limiter(60), ordersRouter);
 // webhook Midtrans tidak dibatasi (Midtrans mengulang notifikasi yang gagal)
 app.use('/api/payments', paymentsRouter);
 app.use('/api/subscribers', limiter(5), subscribersRouter);
+// scanner gerbang bisa memindai ratusan tiket per menit, jadi batasnya longgar
+app.use('/api/gate', limiter(600), gateRouter);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Endpoint tidak ditemukan.' });
