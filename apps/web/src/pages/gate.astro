@@ -1,0 +1,16 @@
+---
+// Halaman petugas gerbang: pindai QR e-tiket untuk check-in. Tidak diindeks mesin pencari.
+import Layout from '../layouts/Layout.astro';
+import GateScanner from '../components/GateScanner.tsx';
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<Layout title="Scanner gerbang · Skena Sonik" noindex>
+  <main class="min-h-dvh bg-ink py-6 sm:py-10">
+    <div class="wrap grid gap-5">
+      <a href="/" class="logo-type justify-self-center text-3xl no-underline">Skena Sonik</a>
+      <GateScanner client:only="react" />
+    </div>
+  </main>
+</Layout>

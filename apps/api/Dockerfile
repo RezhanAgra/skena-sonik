@@ -26,6 +26,8 @@ FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app/apps/api
 COPY --from=build /app/apps/api/dist ./dist
+# folder tulis untuk EMAIL_PROVIDER=log (salinan email HTML)
+RUN mkdir -p tmp && chown node:node tmp
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

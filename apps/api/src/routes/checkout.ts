@@ -2,13 +2,16 @@
 // POST /api/checkout                         — buat pesanan + sesi pembayaran
 // GET  /api/orders/:code                     — status pesanan (dicek ulang ke gateway kalau masih PENDING)
 // POST /api/payments/midtrans/notification   — webhook Midtrans
+// POST /api/orders/:code/resend-tickets      — kirim ulang e-tiket ke email pembeli
 // POST /api/payments/mock/:code              — simulasi bayar (hanya PAYMENT_PROVIDER=mock)
 import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { prisma } from '../db.ts';
 import { OrderStatus } from '../generated/prisma/client.ts';
-import { applyPaymentUpdate, generateOrderCode, publicOrder } from '../lib/orders.ts';
+import { rateLimit } from 'express-rate-limit';
+import { deliverTickets } from '../lib/delivery.ts';
+import { ORDER_INCLUDE, applyPaymentUpdate, generateOrderCode, publicOrder } from '../lib/orders.ts';
 import { payments, PaymentError } from '../lib/payments/index.ts';
 import { toUpdate, verifyMidtransSignature, type MidtransStatus } from '../lib/payments/midtrans.ts';
 import { PRICING, quoteCart } from '../lib/pricing.ts';
@@ -88,7 +91,7 @@ export const ordersRouter = Router();
 
 ordersRouter.get('/:code', async (req, res) => {
   const code = req.params.code.toUpperCase();
-  let order = await prisma.order.findUnique({ where: { code }, include: { items: true } });
+  let order = await prisma.order.findUnique({ where: { code }, include: ORDER_INCLUDE });
   if (!order) {
     res.status(404).json({ error: 'Pesanan tidak ditemukan.' });
     return;
@@ -100,14 +103,43 @@ ordersRouter.get('/:code', async (req, res) => {
       const update = await payments.fetchStatus(code);
       if (update) {
         await applyPaymentUpdate(code, update);
-        order = await prisma.order.findUniqueOrThrow({ where: { code }, include: { items: true } });
+        order = await prisma.order.findUniqueOrThrow({ where: { code }, include: ORDER_INCLUDE });
       }
     } catch (err) {
       if (!(err instanceof PaymentError)) throw err;
     }
   }
 
-  res.json(publicOrder(order));
+  res.json(await publicOrder(order));
+});
+
+// maksimal 3 kali per 10 menit per IP supaya tidak dipakai untuk spam email
+const resendLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 3,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Kirim ulang dibatasi 3 kali per 10 menit. Cek folder Spam/Promosi dulu ya.' }
+});
+
+ordersRouter.post('/:code/resend-tickets', resendLimiter, async (req, res) => {
+  const code = String(req.params.code).toUpperCase();
+  const order = await prisma.order.findUnique({ where: { code } });
+  if (!order) {
+    res.status(404).json({ error: 'Pesanan tidak ditemukan.' });
+    return;
+  }
+  if (order.status !== OrderStatus.PAID) {
+    res.status(409).json({ error: 'E-tiket hanya bisa dikirim untuk pesanan yang sudah lunas.' });
+    return;
+  }
+  const result = await deliverTickets(code);
+  if (!result.sent) {
+    res.status(502).json({ error: 'Email gagal terkirim. Coba lagi beberapa saat lagi.' });
+    return;
+  }
+  const updated = await prisma.order.findUniqueOrThrow({ where: { code }, include: ORDER_INCLUDE });
+  res.json(await publicOrder(updated));
 });
 
 export const paymentsRouter = Router();
@@ -141,6 +173,6 @@ paymentsRouter.post('/mock/:code', async (req, res) => {
   }
   const status = { paid: OrderStatus.PAID, failed: OrderStatus.FAILED, expired: OrderStatus.EXPIRED }[result];
   await applyPaymentUpdate(order.code, { status, paymentType: 'simulasi', grossAmount: order.total });
-  const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: { items: true } });
-  res.json(publicOrder(updated));
+  const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: ORDER_INCLUDE });
+  res.json(await publicOrder(updated));
 });

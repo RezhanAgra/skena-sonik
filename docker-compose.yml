@@ -28,6 +28,14 @@ services:
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
       MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      TICKET_SECRET: ${TICKET_SECRET:?isi TICKET_SECRET di .env (openssl rand -hex 32)}
+      GATE_TOKEN: ${GATE_TOKEN:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

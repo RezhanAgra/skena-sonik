@@ -79,7 +79,7 @@ const songs = [
 
 const tiers = [
   { slug: 'early-bird', name: 'Early Bird', price: 350000, perks: ['Terjual habis dalam 11 menit'], soldOut: true, badge: 'Sold out' },
-  { slug: 'daily', name: 'Daily Pass', price: 450000, perks: ['Akses 1 hari pilihan', 'Gelang cashless'] },
+  { slug: 'daily', name: 'Daily Pass', price: 450000, daysAccess: 1, perks: ['Akses 1 hari pilihan', 'Gelang cashless'] },
   {
     slug: 'two-day', name: '2-Day Pass', price: 790000, badge: 'Paling laku', squadPrice: 700000, squadMin: 4,
     perks: ['Akses Sabtu & Minggu', 'Rp700rb/orang untuk squad 4+']
@@ -113,7 +113,7 @@ async function main() {
 
     // tier dipakai oleh order, jadi di-upsert, bukan dihapus
     for (const [i, t] of tiers.entries()) {
-      const data = { soldOut: false, badge: null, squadPrice: null, squadMin: null, ...t, sortOrder: i };
+      const data = { soldOut: false, badge: null, squadPrice: null, squadMin: null, daysAccess: 2, ...t, sortOrder: i };
       await tx.ticketTier.upsert({ where: { slug: t.slug }, create: data, update: data });
     }
   });

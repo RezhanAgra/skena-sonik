@@ -90,6 +90,8 @@ model TicketTier {
   soldOut    Boolean     @default(false)
   squadPrice Int? // harga per orang kalau beli >= squadMin
   squadMin   Int?
+  // berapa hari tiket ini bisa dipakai masuk: 1 = satu hari pilihan, 2 = Sabtu & Minggu
+  daysAccess Int         @default(2)
   sortOrder  Int         @default(0)
   orderItems OrderItem[]
 }
@@ -111,23 +113,27 @@ enum OrderStatus {
 
 /// Pesanan tiket. `code` dipakai sebagai order_id di payment gateway dan di URL /pesanan/[code].
 model Order {
-  id              Int         @id @default(autoincrement())
-  code            String      @unique
-  status          OrderStatus @default(PENDING)
-  buyerName       String
-  buyerEmail      String
-  buyerPhone      String
-  subtotal        Int
-  fee             Int
-  total           Int
-  paymentProvider String // midtrans | mock
-  paymentToken    String?
-  paymentUrl      String?
-  paymentType     String? // qris, gopay, bank_transfer, credit_card, dll.
-  paidAt          DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  items           OrderItem[]
+  id                Int         @id @default(autoincrement())
+  code              String      @unique
+  status            OrderStatus @default(PENDING)
+  buyerName         String
+  buyerEmail        String
+  buyerPhone        String
+  subtotal          Int
+  fee               Int
+  total             Int
+  paymentProvider   String // midtrans | mock
+  paymentToken      String?
+  paymentUrl        String?
+  paymentType       String? // qris, gopay, bank_transfer, credit_card, dll.
+  paidAt            DateTime?
+  // pengiriman e-tiket: diisi saat email terkirim / gagal (untuk kirim ulang)
+  ticketsEmailedAt  DateTime?
+  ticketsEmailError String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  items             OrderItem[]
+  tickets           Ticket[]
 
   @@index([status])
 }
@@ -143,6 +149,39 @@ model OrderItem {
   quantity  Int
   unitPrice Int
   subtotal  Int
+  tickets   Ticket[]
 
   @@index([orderId])
+}
+
+/// E-tiket: satu per orang. QR berisi `code` + tanda tangan HMAC, dipindai di gerbang untuk check-in.
+model Ticket {
+  id          Int             @id @default(autoincrement())
+  code        String          @unique
+  orderId     Int
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId Int
+  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  tierSlug    String
+  tierName    String
+  holderName  String
+  // urutan tiket di dalam pesanan (1, 2, 3, ...), ditampilkan sebagai "Tiket 2 dari 5"
+  seq         Int
+  daysAccess  Int // disalin dari TicketTier saat tiket terbit
+  createdAt   DateTime        @default(now())
+  checkIns    TicketCheckIn[]
+
+  @@index([orderId])
+}
+
+/// Catatan masuk gerbang: maksimal satu kali per tiket per hari festival
+model TicketCheckIn {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  day       Int // 1 = Sabtu 12 Des, 2 = Minggu 13 Des
+  gate      String?
+  createdAt DateTime @default(now())
+
+  @@unique([ticketId, day])
 }

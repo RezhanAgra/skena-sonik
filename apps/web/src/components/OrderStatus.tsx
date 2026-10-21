@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { rupiah } from '../lib/format';
-import type { OrderStatus as Status, OrderView } from '../lib/types';
+import type { ETicket, OrderStatus as Status, OrderView } from '../lib/types';
 import { clearCartIfPaid } from '../stores/cart';
 
 const POLL_MS = 4000;
@@ -10,7 +10,7 @@ const POLL_LIMIT = 150; // ±10 menit
 
 const STATUS: Record<Status, { label: string; title: string; desc: string; tone: string }> = {
   PENDING: { label: 'Menunggu pembayaran', title: 'Selesaikan pembayaranmu', desc: 'Halaman ini akan berubah otomatis begitu pembayaran diterima.', tone: 'border-amber-400/60 text-amber-300' },
-  PAID: { label: 'Lunas', title: 'Tiketmu sudah aman!', desc: 'Pembayaran diterima. Simpan kode pesanan ini dan tunjukkan saat penukaran gelang di venue.', tone: 'border-emerald-400/60 text-emerald-300' },
+  PAID: { label: 'Lunas', title: 'Tiketmu sudah aman!', desc: 'Pembayaran diterima. E-tiket ber-QR ada di bawah dan juga dikirim ke email kamu. Tunjukkan QR di gerbang masuk.', tone: 'border-emerald-400/60 text-emerald-300' },
   FAILED: { label: 'Gagal', title: 'Pembayaran gagal', desc: 'Pembayaran ditolak atau gagal diproses. Tidak ada dana yang ditarik. Silakan pesan ulang.', tone: 'border-flare text-flare' },
   EXPIRED: { label: 'Kedaluwarsa', title: 'Batas waktu bayar habis', desc: 'Pesanan ini tidak dibayar sampai batas waktu. Silakan pesan ulang.', tone: 'border-line text-muted' },
   CANCELLED: { label: 'Dibatalkan', title: 'Pesanan dibatalkan', desc: 'Pesanan ini sudah dibatalkan.', tone: 'border-line text-muted' },
@@ -21,6 +21,27 @@ const PAYMENT_LABEL: Record<string, string> = {
   qris: 'QRIS', gopay: 'GoPay', shopeepay: 'ShopeePay', bank_transfer: 'Transfer bank (VA)', echannel: 'Mandiri Bill',
   credit_card: 'Kartu kredit/debit', cstore: 'Gerai retail', akulaku: 'Akulaku', simulasi: 'Simulasi (mode demo)'
 };
+
+const DAY_SHORT: Record<number, string> = { 1: 'Sab', 2: 'Min' };
+
+function TicketCard({ ticket, total }: { ticket: ETicket; total: number }) {
+  const used = ticket.checkIns.map(c => DAY_SHORT[c.day] ?? `Hari ${c.day}`).join(' & ');
+  return (
+    <li className="grid gap-3 rounded-[14px] border border-line bg-panel-2 p-4 sm:grid-cols-[180px_1fr] sm:items-center">
+      {/* SVG QR dibuat oleh API kita sendiri (bukan input pengguna), aman disisipkan */}
+      <div className="mx-auto w-full max-w-[220px] overflow-hidden rounded-[10px] bg-white p-1.5 [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+        role="img" aria-label={`QR tiket ${ticket.code}`} dangerouslySetInnerHTML={{ __html: ticket.qrSvg }} />
+      <div className="grid min-w-0 gap-1 text-center sm:text-left">
+        <span className="font-mono text-[0.68rem] uppercase tracking-widest text-flare">Tiket {ticket.seq} dari {total}</span>
+        <b className="text-lg font-black uppercase">{ticket.tierName}</b>
+        <span className="text-sm text-muted">{ticket.access}</span>
+        <span className="font-mono text-base font-bold tracking-wider">{ticket.code}</span>
+        <span className="text-xs text-muted">Atas nama {ticket.holderName}</span>
+        {used && <span className="text-xs font-bold text-emerald-300">Sudah dipakai masuk: {used}</span>}
+      </div>
+    </li>
+  );
+}
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -48,6 +69,26 @@ export default function OrderStatus({ initial }: { initial: OrderView }) {
     try { setOrder(await api.mockPay(order.code, result)); } catch (err) { setError((err as Error).message); }
     setBusy(false);
   };
+
+  const [resendNote, setResendNote] = useState('');
+  const resend = async () => {
+    setBusy(true);
+    setResendNote('');
+    try {
+      setOrder(await api.resendTickets(order.code));
+      setResendNote(`E-tiket dikirim ulang ke ${order.buyerEmail}. Cek juga folder Spam/Promosi.`);
+    } catch (err) {
+      setResendNote((err as Error).message);
+    }
+    setBusy(false);
+  };
+
+  // tiket terbit beberapa detik setelah lunas: muat ulang sekali kalau belum ada
+  useEffect(() => {
+    if (order.status !== 'PAID' || order.tickets.length) return;
+    const id = setTimeout(async () => { try { setOrder(await api.order(order.code)); } catch {} }, 2500);
+    return () => clearTimeout(id);
+  }, [order.status, order.tickets.length, order.code]);
 
   const copyCode = async () => {
     try { await navigator.clipboard.writeText(order.code); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
@@ -88,6 +129,35 @@ export default function OrderStatus({ initial }: { initial: OrderView }) {
           <span>Total</span><span className="text-flare">{rupiah(order.total)}</span>
         </div>
       </div>
+
+      {order.status === 'PAID' && (
+        <section className="grid gap-3 border-t border-line pt-4" aria-labelledby="eticket-title">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 id="eticket-title" className="text-xl">E-tiket kamu</h2>
+            <span className="text-xs text-muted">1 QR = 1 orang · tunjukkan di gerbang</span>
+          </div>
+          {order.tickets.length ? (
+            <ul className="m-0 grid list-none gap-3 p-0">
+              {order.tickets.map(t => <TicketCard key={t.code} ticket={t} total={order.tickets.length} />)}
+            </ul>
+          ) : (
+            <p className="m-0 text-sm text-muted" role="status">Tiket sedang diterbitkan…</p>
+          )}
+          <div className="grid gap-2 rounded-[12px] border border-line bg-black p-3.5 text-sm">
+            {order.ticketsEmailedAt ? (
+              <span>✉️ E-tiket sudah dikirim ke <b>{order.buyerEmail}</b> pada {dateTime(order.ticketsEmailedAt)}.</span>
+            ) : order.ticketsEmailFailed ? (
+              <span className="text-[#ffb3b3]">Email e-tiket ke {order.buyerEmail} belum berhasil terkirim. Coba kirim ulang.</span>
+            ) : (
+              <span className="text-muted">E-tiket sedang dikirim ke {order.buyerEmail}…</span>
+            )}
+            <button type="button" className="btn btn-ghost justify-self-start px-3 py-2 text-xs" disabled={busy} onClick={resend}>
+              Kirim ulang e-tiket
+            </button>
+            {resendNote && <span className="text-xs text-muted" role="status">{resendNote}</span>}
+          </div>
+        </section>
+      )}
 
       {order.status === 'PENDING' && order.paymentProvider === 'mock' && (
         <div className="grid gap-2.5 rounded-[12px] border border-amber-400/40 bg-amber-400/5 p-4">

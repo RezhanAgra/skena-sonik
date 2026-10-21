@@ -22,11 +22,13 @@ apps/
       lib/pricing.ts      satu-satunya tempat harga tiket & keranjang dihitung
       lib/orders.ts       kode pesanan, perubahan status pembayaran
       lib/payments/       Midtrans Snap + mode mock (simulasi)
-      routes/             festival, tickets, checkout (keranjang, pesanan, webhook), subscribers
+      lib/tickets.ts      e-tiket: kode, QR bertanda tangan, aturan check-in per hari
+      lib/email/          template e-tiket + pengirim (SMTP Gmail / mode log)
+      routes/             festival, tickets, checkout (keranjang, pesanan, webhook), gate, subscribers
     Dockerfile
   web/                    Astro 6 (SSR, adapter Node) + React 19 + Tailwind 4
     src/
-      pages/              index, pesanan/[code] (status pesanan), 404, robots.txt, sitemap.xml
+      pages/              index, pesanan/[code] (status + e-tiket), gate (scanner petugas), 404, robots.txt, sitemap.xml
       layouts/            <head>, SEO & Open Graph, font
       components/         *.astro = statis, *.tsx = island interaktif
       stores/             state bersama antar island (nanostores)
@@ -163,13 +165,61 @@ Alur belanja:
 
 > **Server Key bersifat rahasia.** Simpan hanya di `.env` server, jangan di-commit, dan jangan dimasukkan ke kode web.
 
+## E-tiket & akses masuk (QR)
+
+Begitu pesanan **lunas**:
+1. API menerbitkan **satu e-tiket per orang**, masing-masing dengan kode unik `TKT-XXXX-XXXX`.
+2. Setiap tiket punya **QR bertanda tangan** (HMAC dengan `TICKET_SECRET`). QR tidak bisa dibuat-buat hanya dengan menebak kode tiket.
+3. E-tiket dikirim ke **email pembeli** dengan QR sebagai gambar inline, sehingga tampil di Gmail tanpa perlu klik "tampilkan gambar".
+4. QR yang sama juga tampil di halaman `/pesanan/KODE`, lengkap dengan tombol **Kirim ulang e-tiket** (maksimal 3× per 10 menit).
+
+### Aturan masuk gerbang
+
+| Tiket | Berlaku | Keterangan |
+| --- | --- | --- |
+| 2-Day Pass, Pit Pass | Sabtu **dan** Minggu | maksimal 1× masuk per hari |
+| Daily Pass | **1 hari pilihan** | hari pertama dipindai menjadi harinya |
+
+Jumlah hari diatur lewat kolom `daysAccess` di tabel `TicketTier`.
+
+### Scanner petugas (`/gate`)
+
+1. Isi `GATE_TOKEN` (PIN petugas) di konfigurasi API.
+2. Petugas membuka `https://DOMAIN/gate` di HP, memasukkan PIN, memilih hari dan nama gerbang, lalu menyalakan kamera.
+3. Hasil pindaian tampil besar: **hijau** (silakan masuk), **kuning** (sudah dipakai / bukan untuk hari ini), **merah** (tidak valid), disertai getar dan bunyi.
+4. Kalau QR rusak, kode `TKT-…` bisa diketik manual.
+5. Beberapa gerbang bisa jalan bersamaan; satu tiket tidak bisa masuk dua kali di hari yang sama walaupun dipindai serentak.
+
+Kamera hanya bisa dibuka lewat **HTTPS** (atau localhost).
+
+### Email lewat Gmail
+
+1. Pakai akun Gmail khusus, misalnya `skenasonik.tiket@gmail.com`.
+2. Aktifkan **Verifikasi 2 Langkah** di akun itu.
+3. Buat **App Password** di **myaccount.google.com/apppasswords**. Hasilnya 16 huruf; tulis tanpa spasi.
+4. Isi `.env`:
+   ```env
+   EMAIL_PROVIDER=smtp
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   SMTP_USER=skenasonik.tiket@gmail.com
+   SMTP_PASS=abcdefghijklmnop
+   EMAIL_FROM=Skena Sonik <skenasonik.tiket@gmail.com>
+   ```
+5. Saat API start, login SMTP langsung dicek. Kalau password salah, log menampilkan `SMTP gagal login`.
+
+Gmail biasa dibatasi sekitar **500 email per hari**. Untuk penjualan besar, ganti `SMTP_*` ke layanan email transaksional (Brevo, Mailgun, Amazon SES, dan sebagainya); kodenya tidak perlu diubah.
+
+Saat development, `EMAIL_PROVIDER=log` tidak mengirim apa pun. Setiap email disimpan sebagai file HTML di `apps/api/tmp/emails/` supaya bisa dibuka di browser.
+
 ## Environment variable
 
 | Variabel | Dipakai | Keterangan |
 | --- | --- | --- |
 | `DATABASE_URL` | api | Supabase transaction pooler (port 6543, `?pgbouncer=true`) |
 | `DIRECT_URL` | migrasi | Supabase session pooler / direct (port 5432) |
-| `PORT` | api, web | default 4000 (api) dan 4321 (web) |
+| `API_PORT` | api | port API saat development (default 4000) |
+| `PORT` | api, web | port di produksi/Docker: 4000 (api) dan 4321 (web) |
 | `TRUST_PROXY` | api | jumlah proxy di depan API, `1` di belakang Caddy/Nginx |
 | `CORS_ORIGIN` | api | opsional, hanya kalau API di domain berbeda |
 | `API_URL` | web | alamat API untuk SSR, dibaca saat runtime |
@@ -178,6 +228,11 @@ Alur belanja:
 | `PAYMENT_PROVIDER` | api | `midtrans` atau `mock` |
 | `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY` | api | key dari dashboard Midtrans |
 | `MIDTRANS_IS_PRODUCTION` | api | `false` = sandbox, `true` = uang sungguhan |
+| `TICKET_SECRET` | api | kunci tanda tangan QR, wajib di produksi (`openssl rand -hex 32`) |
+| `GATE_TOKEN` | api | PIN petugas untuk `/gate`; kosong = scanner nonaktif |
+| `EMAIL_PROVIDER` | api | `smtp` (kirim sungguhan) atau `log` (simpan file HTML) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | api | akun pengirim email e-tiket |
+| `DATABASE_POOL_MAX` | api | koneksi database maksimum per proses (default 10) |
 | `DOMAIN`, `ACME_EMAIL` | docker-compose | domain situs dan email sertifikat HTTPS |
 
 ## API
@@ -192,6 +247,10 @@ Alur belanja:
 | GET | `/api/orders/:code` | status & rincian pesanan | 60/menit |
 | POST | `/api/payments/midtrans/notification` | webhook Midtrans (signature diverifikasi) | – |
 | POST | `/api/payments/mock/:code` | simulasi hasil bayar (hanya mode `mock`) | – |
+| POST | `/api/orders/:code/resend-tickets` | kirim ulang e-tiket ke email pembeli | 3/10 menit |
+| GET | `/api/gate/me` | cek PIN petugas (header `Authorization: Bearer GATE_TOKEN`) | 600/menit |
+| POST | `/api/gate/check-in` | check-in tiket `{ qr, day, gate }` | 600/menit |
+| GET | `/api/gate/stats` | jumlah tiket terbit & yang sudah masuk per hari | 600/menit |
 | POST | `/api/subscribers` | daftar info presale `{ email }` | 5/menit |
 
 ## Mengubah konten

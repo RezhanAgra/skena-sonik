@@ -3,7 +3,7 @@
 //   meneruskannya ke container API; di dev, proxy Vite (astro.config.mjs) yang meneruskan.
 //   PUBLIC_API_URL hanya perlu diisi kalau API sengaja di-host di domain lain (perlu CORS_ORIGIN di API).
 // - Server (SSR): buat client sendiri dengan API_URL dari `astro:env/server` (dibaca saat runtime).
-import type { Buyer, CartItem, CartQuote, CheckoutResult, Festival, OrderView, Quote } from './types';
+import type { Buyer, CartItem, CartQuote, CheckInResult, CheckoutResult, Festival, GateInfo, GateStats, OrderView, Quote } from './types';
 
 export class ApiError extends Error {}
 
@@ -34,6 +34,16 @@ export function createApi(base: string) {
     checkout: (items: CartItem[], buyer: Buyer) => post<CheckoutResult>('/api/checkout', { items, buyer }),
     order: (code: string) => request<OrderView>(`/api/orders/${encodeURIComponent(code)}`),
     mockPay: (code: string, result: 'paid' | 'failed' | 'expired') => post<OrderView>(`/api/payments/mock/${encodeURIComponent(code)}`, { result }),
+    resendTickets: (code: string) => post<OrderView>(`/api/orders/${encodeURIComponent(code)}/resend-tickets`, {}),
+    gate: (token: string) => {
+      const headers = { Authorization: `Bearer ${token}` };
+      return {
+        me: () => request<GateInfo>('/api/gate/me', { headers }),
+        stats: () => request<GateStats>('/api/gate/stats', { headers }),
+        checkIn: (qr: string, day: number, gate: string) =>
+          request<CheckInResult>('/api/gate/check-in', { method: 'POST', headers, body: JSON.stringify({ qr, day, gate }) })
+      };
+    },
     subscribe: (email: string) => post<{ status: 'created' | 'exists'; email: string }>('/api/subscribers', { email })
   };
 }

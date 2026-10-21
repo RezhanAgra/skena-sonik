@@ -1,8 +1,11 @@
 // Logika pesanan: kode pesanan, perubahan status dari payment gateway, dan bentuk data publik.
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../db.ts';
-import { OrderStatus, type Order, type OrderItem } from '../generated/prisma/client.ts';
+import { OrderStatus, type Order, type OrderItem, type Ticket, type TicketCheckIn } from '../generated/prisma/client.ts';
+import { deliverTicketsInBackground } from './delivery.ts';
+import { accessLabel } from './event.ts';
 import type { PaymentUpdate } from './payments/index.ts';
+import { qrSvg } from './tickets.ts';
 
 // tanpa huruf yang mirip angka (0/O, 1/I/L) supaya mudah dibacakan ke CS
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -32,25 +35,40 @@ export async function applyPaymentUpdate(code: string, update: PaymentUpdate) {
     return order;
   }
 
-  const statusChanges = update.status !== order.status && ALLOWED[order.status].includes(update.status);
-  if (!statusChanges && (update.paymentType ?? order.paymentType) === order.paymentType) return order;
-
-  const updated = await prisma.order.update({
-    where: { code },
-    data: {
-      ...(statusChanges ? { status: update.status } : {}),
-      ...(statusChanges && update.status === OrderStatus.PAID ? { paidAt: new Date() } : {}),
-      paymentType: update.paymentType ?? order.paymentType
+  const wantsChange = update.status !== order.status && ALLOWED[order.status].includes(update.status);
+  if (wantsChange) {
+    // atomik: hanya berubah kalau status di DB masih sama dengan yang kita baca.
+    // Webhook dan polling halaman bisa datang bersamaan; hanya satu yang "menang".
+    const { count } = await prisma.order.updateMany({
+      where: { code, status: order.status },
+      data: {
+        status: update.status,
+        ...(update.status === OrderStatus.PAID ? { paidAt: new Date() } : {}),
+        paymentType: update.paymentType ?? order.paymentType
+      }
+    });
+    if (count === 1) {
+      console.log(`Pesanan ${code}: ${order.status} → ${update.status}`);
+      if (update.status === OrderStatus.PAID) deliverTicketsInBackground(code);
     }
-  });
-  if (statusChanges) console.log(`Pesanan ${code}: ${order.status} → ${update.status}`);
-  return updated;
+  } else if (update.paymentType && update.paymentType !== order.paymentType) {
+    await prisma.order.update({ where: { code }, data: { paymentType: update.paymentType } });
+  }
+  return prisma.order.findUniqueOrThrow({ where: { code } });
 }
 
 const maskEmail = (email: string) => email.replace(/^(.{2})[^@]*(@.*)$/, (_, a, b) => `${a}***${b}`);
 
-/** Data pesanan yang aman ditampilkan ke siapa pun yang tahu kodenya */
-export function publicOrder(order: Order & { items: OrderItem[] }) {
+type FullOrder = Order & { items: OrderItem[]; tickets: (Ticket & { checkIns: TicketCheckIn[] })[] };
+
+export const ORDER_INCLUDE = {
+  items: true,
+  tickets: { orderBy: { seq: 'asc' }, include: { checkIns: { orderBy: { day: 'asc' } } } }
+} as const;
+
+/** Data pesanan yang aman ditampilkan ke siapa pun yang tahu kodenya (kode pesanan = tautan rahasia) */
+export async function publicOrder(order: FullOrder) {
+  const paid = order.status === OrderStatus.PAID;
   return {
     code: order.code,
     status: order.status,
@@ -64,6 +82,20 @@ export function publicOrder(order: Order & { items: OrderItem[] }) {
     paymentType: order.paymentType,
     paymentUrl: order.status === OrderStatus.PENDING ? order.paymentUrl : null,
     paidAt: order.paidAt,
-    createdAt: order.createdAt
+    createdAt: order.createdAt,
+    ticketsEmailedAt: order.ticketsEmailedAt,
+    ticketsEmailFailed: Boolean(order.ticketsEmailError) && !order.ticketsEmailedAt,
+    // QR hanya ditampilkan untuk pesanan lunas
+    tickets: paid
+      ? await Promise.all(order.tickets.map(async t => ({
+          code: t.code,
+          tierName: t.tierName,
+          holderName: t.holderName,
+          seq: t.seq,
+          access: accessLabel(t.daysAccess),
+          checkIns: t.checkIns.map(c => ({ day: c.day, at: c.createdAt })),
+          qrSvg: await qrSvg(t.code)
+        })))
+      : []
   };
 }
