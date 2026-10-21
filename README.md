@@ -24,6 +24,8 @@ apps/
       lib/payments/       Midtrans Snap + mode mock (simulasi)
       lib/tickets.ts      e-tiket: kode, QR bertanda tangan, aturan check-in per hari
       lib/email/          template e-tiket + pengirim (SMTP Gmail / mode log)
+      lib/pdf/            PDF e-tiket (pdf-lib): 1 halaman A4 per tiket + syarat & ketentuan
+    assets/               banner & logo untuk PDF e-tiket
       routes/             festival, tickets, checkout (keranjang, pesanan, webhook), gate, subscribers
     Dockerfile
   web/                    Astro 6 (SSR, adapter Node) + React 19 + Tailwind 4
@@ -171,7 +173,20 @@ Begitu pesanan **lunas**:
 1. API menerbitkan **satu e-tiket per orang**, masing-masing dengan kode unik `TKT-XXXX-XXXX`.
 2. Setiap tiket punya **QR bertanda tangan** (HMAC dengan `TICKET_SECRET`). QR tidak bisa dibuat-buat hanya dengan menebak kode tiket.
 3. E-tiket dikirim ke **email pembeli** dengan QR sebagai gambar inline, sehingga tampil di Gmail tanpa perlu klik "tampilkan gambar".
-4. QR yang sama juga tampil di halaman `/pesanan/KODE`, lengkap dengan tombol **Kirim ulang e-tiket** (maksimal 3× per 10 menit).
+4. Email juga membawa lampiran **PDF e-tiket** (`E-tiket-KODE.pdf`).
+5. Halaman `/pesanan/KODE` menampilkan kartu e-tiket yang sama dengan PDF, tombol **Download PDF** per tiket, **Download semua tiket**, dan **Kirim ulang e-tiket** (maksimal 3× per 10 menit).
+
+### PDF e-tiket
+
+Setiap tiket mendapat satu halaman A4. Isinya:
+- **Header:** logo dan tulisan E-TIKET.
+- **Banner** dan nama acara.
+- **Lokasi, Tanggal, dan Waktu**, dengan label dua bahasa.
+- **ID Pesanan, Nama, dan Kategori Tiket.**
+- **QR, kode tiket, dan "Tiket X dari N".**
+- **Footer** kontak (dari `EMAIL_FROM` dan `SITE_URL`).
+
+Halaman terakhir berisi Syarat & Ketentuan. Isi acara dan syarat diatur di `apps/api/src/lib/event.ts`. Gambar banner dan logo ada di `apps/api/assets/`; ganti filenya untuk mengubah tampilan PDF.
 
 ### Aturan masuk gerbang
 
@@ -248,6 +263,7 @@ Saat development, `EMAIL_PROVIDER=log` tidak mengirim apa pun. Setiap email disi
 | POST | `/api/payments/midtrans/notification` | webhook Midtrans (signature diverifikasi) | – |
 | POST | `/api/payments/mock/:code` | simulasi hasil bayar (hanya mode `mock`) | – |
 | POST | `/api/orders/:code/resend-tickets` | kirim ulang e-tiket ke email pembeli | 3/10 menit |
+| GET | `/api/orders/:code/tickets.pdf` | download PDF e-tiket (semua, atau `?ticket=TKT-…` untuk satu) | 60/menit |
 | GET | `/api/gate/me` | cek PIN petugas (header `Authorization: Bearer GATE_TOKEN`) | 600/menit |
 | POST | `/api/gate/check-in` | check-in tiket `{ qr, day, gate }` | 600/menit |
 | GET | `/api/gate/stats` | jumlah tiket terbit & yang sudah masuk per hari | 600/menit |

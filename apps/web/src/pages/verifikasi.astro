@@ -1,0 +1,12 @@
+---
+import AuthShell from '../components/auth/AuthShell.astro';
+import { VerifyEmail } from '../components/auth/AuthForms.tsx';
+
+const token = Astro.url.searchParams.get('token') ?? '';
+Astro.response.headers.set('Cache-Control', 'no-store');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+---
+
+<AuthShell title="Verifikasi email">
+  <VerifyEmail client:load token={token} />
+</AuthShell>

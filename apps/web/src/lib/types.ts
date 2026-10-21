@@ -105,6 +105,8 @@ export interface OrderView {
   createdAt: string;
   ticketsEmailedAt: string | null;
   ticketsEmailFailed: boolean;
+  emailDelivery: 'smtp' | 'log';
+  event: { name: string; location: string; hours: string };
   tickets: ETicket[];
 }
 
@@ -114,6 +116,7 @@ export interface ETicket {
   holderName: string;
   seq: number;
   access: string;
+  dateLabel: string;
   checkIns: { day: number; at: string }[];
   /** SVG QR dari API (tepercaya, dibuat server) */
   qrSvg: string;
@@ -121,7 +124,7 @@ export interface ETicket {
 
 /* ---------- gerbang ---------- */
 
-export interface GateInfo { ok: true; event: string; today: number | null; days: { day: number; label: string }[] }
+export interface GateInfo { ok: true; staff: { name: string; role: Role } | null; event: string; today: number | null; days: { day: number; label: string }[] }
 
 export interface GateTicket {
   code: string;
@@ -142,3 +145,53 @@ export interface CheckInResult {
 }
 
 export interface GateStats { issued: number; checkedIn: { day: number; count: number }[] }
+
+/* ---------- akun ---------- */
+
+export type Role = 'AUDIENCE' | 'STAFF' | 'ORGANIZER';
+
+export interface AuthUser { id: number; email: string; name: string; phone: string | null; role: Role; emailVerified: boolean }
+
+export interface MyOrder {
+  code: string;
+  status: OrderStatus;
+  total: number;
+  createdAt: string;
+  paidAt: string | null;
+  items: { tierName: string; quantity: number }[];
+  ticketCount: number;
+}
+export interface MyOrders { emailVerified: boolean; orders: MyOrder[] }
+
+/* ---------- dasbor penyelenggara ---------- */
+
+export interface AdminStats {
+  revenue: number;
+  serviceFees: number;
+  orders: Record<OrderStatus, number>;
+  ticketsIssued: number;
+  perTier: { tier: string; name: string; sold: number; revenue: number }[];
+  checkIns: { day: number; label: string; count: number }[];
+  daily: { date: string; revenue: number; orders: number }[];
+  accounts: Record<Role, number>;
+}
+
+export interface AdminOrder {
+  code: string;
+  status: OrderStatus;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string;
+  total: number;
+  items: { tierName: string; quantity: number }[];
+  ticketCount: number;
+  paymentType: string | null;
+  ticketsEmailedAt: string | null;
+  ticketsEmailError: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  hasAccount: boolean;
+}
+export interface AdminOrderPage { page: number; pageSize: number; total: number; orders: AdminOrder[] }
+
+export interface TeamMember { id: number; name: string; email: string; role: Role; emailVerified: boolean; createdAt: string }

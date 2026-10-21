@@ -1,0 +1,28 @@
+---
+// Dasbor penyelenggara (hanya peran ORGANIZER)
+import Layout from '../layouts/Layout.astro';
+import Dashboard from '../components/dashboard/Dashboard.tsx';
+import { requireUser } from '../lib/session';
+
+const { user, redirect, forbidden } = await requireUser(Astro, ['ORGANIZER']);
+if (redirect) return redirect;
+Astro.response.headers.set('Cache-Control', 'no-store');
+if (forbidden) Astro.response.status = 403;
+---
+
+<Layout title="Dasbor · Skena Sonik" noindex>
+  <main class="min-h-dvh bg-ink py-8 sm:py-12">
+    <div class="wrap grid gap-6">
+      <a href="/" class="logo-type justify-self-center text-4xl no-underline">Skena Sonik</a>
+      {forbidden ? (
+        <section class="card mx-auto grid max-w-[480px] justify-items-center gap-4 rounded-[18px] p-8 text-center">
+          <h1 class="text-2xl">Khusus penyelenggara</h1>
+          <p class="lede">Akun <b class="text-paper">{user!.email}</b> tidak punya akses ke dasbor. Kalau kamu bagian dari tim, minta penyelenggara menambahkan perananmu.</p>
+          <a class="btn btn-white" href="/akun">Ke akun saya</a>
+        </section>
+      ) : (
+        <Dashboard client:load me={user!} />
+      )}
+    </div>
+  </main>
+</Layout>

@@ -1,0 +1,12 @@
+---
+import AuthShell from '../components/auth/AuthShell.astro';
+import { LoginForm } from '../components/auth/AuthForms.tsx';
+import { getUser, safeNext } from '../lib/session';
+
+const next = safeNext(Astro.url.searchParams.get('next'));
+if (await getUser(Astro)) return Astro.redirect(next);
+---
+
+<AuthShell title="Masuk" eyebrow="Akun Skena Sonik" lede="Penonton, petugas gerbang, dan penyelenggara masuk dari sini.">
+  <LoginForm client:load next={next} />
+</AuthShell>

@@ -1,0 +1,19 @@
+---
+// Halaman akun penonton / petugas / penyelenggara (butuh login)
+import Layout from '../layouts/Layout.astro';
+import AccountPage from '../components/account/AccountPage.tsx';
+import { requireUser } from '../lib/session';
+
+const { user, redirect } = await requireUser(Astro);
+if (redirect) return redirect;
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<Layout title="Akun saya · Skena Sonik" noindex>
+  <main class="min-h-dvh bg-ink py-8 sm:py-12">
+    <div class="wrap grid gap-6">
+      <a href="/" class="logo-type justify-self-center text-4xl no-underline">Skena Sonik</a>
+      <AccountPage client:load initialUser={user!} justReset={Astro.url.searchParams.has('reset')} />
+    </div>
+  </main>
+</Layout>

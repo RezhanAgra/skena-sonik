@@ -1,9 +1,10 @@
 // Logika pesanan: kode pesanan, perubahan status dari payment gateway, dan bentuk data publik.
 import { randomBytes } from 'node:crypto';
+import { config } from '../config.ts';
 import { prisma } from '../db.ts';
 import { OrderStatus, type Order, type OrderItem, type Ticket, type TicketCheckIn } from '../generated/prisma/client.ts';
 import { deliverTicketsInBackground } from './delivery.ts';
-import { accessLabel } from './event.ts';
+import { EVENT, accessLabel, ticketDateLabel } from './event.ts';
 import type { PaymentUpdate } from './payments/index.ts';
 import { qrSvg } from './tickets.ts';
 
@@ -84,7 +85,10 @@ export async function publicOrder(order: FullOrder) {
     paidAt: order.paidAt,
     createdAt: order.createdAt,
     ticketsEmailedAt: order.ticketsEmailedAt,
+    // log = mode development: email hanya disimpan sebagai file, tidak benar-benar dikirim
+    emailDelivery: config.EMAIL_PROVIDER,
     ticketsEmailFailed: Boolean(order.ticketsEmailError) && !order.ticketsEmailedAt,
+    event: { name: EVENT.name, location: EVENT.location, hours: EVENT.hours },
     // QR hanya ditampilkan untuk pesanan lunas
     tickets: paid
       ? await Promise.all(order.tickets.map(async t => ({
@@ -93,6 +97,7 @@ export async function publicOrder(order: FullOrder) {
           holderName: t.holderName,
           seq: t.seq,
           access: accessLabel(t.daysAccess),
+          dateLabel: ticketDateLabel(t.daysAccess),
           checkIns: t.checkIns.map(c => ({ day: c.day, at: c.createdAt })),
           qrSvg: await qrSvg(t.code)
         })))

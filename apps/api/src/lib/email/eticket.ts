@@ -1,5 +1,6 @@
 // Template email e-tiket. Ditulis dengan tabel + inline style supaya tampil rapi di Gmail, Outlook, dan aplikasi mail HP.
 import { EVENT, accessLabel } from '../event.ts';
+import { buildTicketsPdf } from '../pdf/eticket-pdf.ts';
 import { qrPng } from '../tickets.ts';
 import type { Mail, MailAttachment } from './mailer.ts';
 
@@ -27,6 +28,12 @@ export async function buildETicketEmail(order: ETicketOrder, orderUrl: string): 
     cid: `qr-${t.code}@skenasonik`,
     contentType: 'image/png'
   })));
+  // PDF berisi semua tiket + syarat & ketentuan, untuk disimpan atau dicetak
+  attachments.push({
+    filename: `E-tiket-${order.code}.pdf`,
+    content: Buffer.from(await buildTicketsPdf(order)),
+    contentType: 'application/pdf'
+  });
 
   const ticketBlocks = order.tickets.map(t => `
     <tr><td style="padding:0 0 16px;">
@@ -72,6 +79,7 @@ export async function buildETicketEmail(order: ETicketOrder, orderUrl: string): 
       </td></tr>
       ${ticketBlocks}
       <tr><td style="padding:4px 0 20px;${font}font-size:14px;line-height:1.7;color:${C.muted};">
+        <b style="color:${C.text};">File PDF e-tiket</b> terlampir di email ini. Simpan di HP atau cetak, isinya sama dengan QR di atas.<br><br>
         <b style="color:${C.text};">Cara masuk</b><br>
         1. Tunjukkan QR di HP (atau hasil cetak) ke petugas gerbang.<br>
         2. Naikkan kecerahan layar supaya QR mudah dipindai.<br>
@@ -98,7 +106,7 @@ export async function buildETicketEmail(order: ETicketOrder, orderUrl: string): 
     '',
     ...order.tickets.map(t => `Tiket ${t.seq}/${total} · ${t.tierName} · ${t.code} (${accessLabel(t.daysAccess)})`),
     '',
-    'QR setiap tiket ada di versi HTML email ini dan di halaman pesanan:',
+    'QR setiap tiket ada di lampiran PDF, di versi HTML email ini, dan di halaman pesanan:',
     orderUrl
   ].join('\n');
 

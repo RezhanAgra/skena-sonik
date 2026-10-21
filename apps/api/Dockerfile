@@ -26,6 +26,8 @@ FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app/apps/api
 COPY --from=build /app/apps/api/dist ./dist
+# gambar untuk PDF e-tiket (banner & logo), dibaca saat runtime
+COPY --from=build /app/apps/api/assets ./assets
 # folder tulis untuk EMAIL_PROVIDER=log (salinan email HTML)
 RUN mkdir -p tmp && chown node:node tmp
 USER node

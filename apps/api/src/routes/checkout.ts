@@ -3,6 +3,7 @@
 // GET  /api/orders/:code                     — status pesanan (dicek ulang ke gateway kalau masih PENDING)
 // POST /api/payments/midtrans/notification   — webhook Midtrans
 // POST /api/orders/:code/resend-tickets      — kirim ulang e-tiket ke email pembeli
+// GET  /api/orders/:code/tickets.pdf         — download PDF e-tiket (?ticket=TKT-... untuk satu tiket)
 // POST /api/payments/mock/:code              — simulasi bayar (hanya PAYMENT_PROVIDER=mock)
 import { Router } from 'express';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ import { prisma } from '../db.ts';
 import { OrderStatus } from '../generated/prisma/client.ts';
 import { rateLimit } from 'express-rate-limit';
 import { deliverTickets } from '../lib/delivery.ts';
+import { buildTicketsPdf } from '../lib/pdf/eticket-pdf.ts';
 import { ORDER_INCLUDE, applyPaymentUpdate, generateOrderCode, publicOrder } from '../lib/orders.ts';
 import { payments, PaymentError } from '../lib/payments/index.ts';
 import { toUpdate, verifyMidtransSignature, type MidtransStatus } from '../lib/payments/midtrans.ts';
@@ -55,6 +57,8 @@ checkoutRouter.post('/', async (req, res) => {
   const order = await prisma.order.create({
     data: {
       code: generateOrderCode(),
+      // pesanan dikaitkan ke akun kalau pembeli sedang masuk
+      userId: res.locals.user?.id ?? null,
       buyerName: buyer.name,
       buyerEmail: buyer.email,
       buyerPhone: buyer.phone,
@@ -140,6 +144,29 @@ ordersRouter.post('/:code/resend-tickets', resendLimiter, async (req, res) => {
   }
   const updated = await prisma.order.findUniqueOrThrow({ where: { code }, include: ORDER_INCLUDE });
   res.json(await publicOrder(updated));
+});
+
+ordersRouter.get('/:code/tickets.pdf', async (req, res) => {
+  const code = String(req.params.code).toUpperCase();
+  const only = typeof req.query.ticket === 'string' ? req.query.ticket.toUpperCase() : undefined;
+  const order = await prisma.order.findUnique({ where: { code }, include: { tickets: { orderBy: { seq: 'asc' } } } });
+  if (!order || order.status !== OrderStatus.PAID || !order.tickets.length) {
+    res.status(404).json({ error: 'E-tiket belum tersedia untuk pesanan ini.' });
+    return;
+  }
+  if (only && !order.tickets.some(t => t.code === only)) {
+    res.status(404).json({ error: 'Tiket tidak ditemukan di pesanan ini.' });
+    return;
+  }
+  const pdf = await buildTicketsPdf(order, only);
+  const filename = only ? `E-tiket-${only}.pdf` : `E-tiket-${order.code}.pdf`;
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+    'Content-Length': String(pdf.length),
+    'Cache-Control': 'no-store'
+  });
+  res.end(Buffer.from(pdf));
 });
 
 export const paymentsRouter = Router();
