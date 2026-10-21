@@ -115,6 +115,9 @@ enum OrderStatus {
 model Order {
   id                Int         @id @default(autoincrement())
   code              String      @unique
+  // akun yang membuat pesanan (kosong kalau checkout tanpa login)
+  userId            Int?
+  user              User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   status            OrderStatus @default(PENDING)
   buyerName         String
   buyerEmail        String
@@ -136,6 +139,8 @@ model Order {
   tickets           Ticket[]
 
   @@index([status])
+  @@index([userId])
+  @@index([buyerEmail])
 }
 
 /// Baris tiket di dalam pesanan. Harga disalin saat checkout supaya tidak berubah kalau harga tier diubah.
@@ -184,4 +189,58 @@ model TicketCheckIn {
   createdAt DateTime @default(now())
 
   @@unique([ticketId, day])
+}
+
+enum Role {
+  AUDIENCE // penonton
+  STAFF // petugas gerbang
+  ORGANIZER // penyelenggara: dasbor, gerbang, kelola tim
+}
+
+/// Akun penonton / petugas / penyelenggara
+model User {
+  id              Int          @id @default(autoincrement())
+  email           String       @unique // selalu huruf kecil
+  name            String
+  phone           String?
+  passwordHash    String
+  role            Role         @default(AUDIENCE)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  sessions        Session[]
+  tokens          EmailToken[]
+  orders          Order[]
+}
+
+/// Sesi login. Cookie berisi token acak; yang disimpan hanya hash SHA-256-nya.
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum EmailTokenType {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+/// Token sekali pakai yang dikirim lewat email (verifikasi email, reset password)
+model EmailToken {
+  id        Int            @id @default(autoincrement())
+  tokenHash String         @unique
+  type      EmailTokenType
+  userId    Int
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
 }

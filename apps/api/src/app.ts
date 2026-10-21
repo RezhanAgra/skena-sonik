@@ -12,6 +12,10 @@ import { ticketsRouter } from './routes/tickets.ts';
 import { cartRouter, checkoutRouter, ordersRouter, paymentsRouter } from './routes/checkout.ts';
 import { subscribersRouter } from './routes/subscribers.ts';
 import { gateRouter } from './routes/gate.ts';
+import { authRouter } from './routes/auth.ts';
+import { accountRouter } from './routes/account.ts';
+import { adminRouter } from './routes/admin.ts';
+import { checkOrigin, loadUser } from './lib/auth/session.ts';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -20,6 +24,8 @@ app.set('trust proxy', config.TRUST_PROXY);
 app.use(helmet());
 if (config.corsOrigins.length) app.use(cors({ origin: config.corsOrigins }));
 app.use(express.json({ limit: '10kb' }));
+app.use('/api', checkOrigin);
+app.use('/api', loadUser);
 
 // log singkat per request: method, path, status, durasi
 const logRequests: RequestHandler = (req, res, next) => {
@@ -58,6 +64,9 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/subscribers', limiter(5), subscribersRouter);
 // scanner gerbang bisa memindai ratusan tiket per menit, jadi batasnya longgar
 app.use('/api/gate', limiter(600), gateRouter);
+app.use('/api/auth', limiter(60), authRouter);
+app.use('/api/me', limiter(60), accountRouter);
+app.use('/api/admin', limiter(120), adminRouter);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Endpoint tidak ditemukan.' });

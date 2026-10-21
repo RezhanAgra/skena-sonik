@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { rupiah } from '../lib/format';
-import type { ETicket, OrderStatus as Status, OrderView } from '../lib/types';
+import type { OrderStatus as Status, OrderView } from '../lib/types';
+import ETicketCard, { pdfUrl } from './ETicketCard';
 import { clearCartIfPaid } from '../stores/cart';
 
 const POLL_MS = 4000;
@@ -21,27 +22,6 @@ const PAYMENT_LABEL: Record<string, string> = {
   qris: 'QRIS', gopay: 'GoPay', shopeepay: 'ShopeePay', bank_transfer: 'Transfer bank (VA)', echannel: 'Mandiri Bill',
   credit_card: 'Kartu kredit/debit', cstore: 'Gerai retail', akulaku: 'Akulaku', simulasi: 'Simulasi (mode demo)'
 };
-
-const DAY_SHORT: Record<number, string> = { 1: 'Sab', 2: 'Min' };
-
-function TicketCard({ ticket, total }: { ticket: ETicket; total: number }) {
-  const used = ticket.checkIns.map(c => DAY_SHORT[c.day] ?? `Hari ${c.day}`).join(' & ');
-  return (
-    <li className="grid gap-3 rounded-[14px] border border-line bg-panel-2 p-4 sm:grid-cols-[180px_1fr] sm:items-center">
-      {/* SVG QR dibuat oleh API kita sendiri (bukan input pengguna), aman disisipkan */}
-      <div className="mx-auto w-full max-w-[220px] overflow-hidden rounded-[10px] bg-white p-1.5 [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-        role="img" aria-label={`QR tiket ${ticket.code}`} dangerouslySetInnerHTML={{ __html: ticket.qrSvg }} />
-      <div className="grid min-w-0 gap-1 text-center sm:text-left">
-        <span className="font-mono text-[0.68rem] uppercase tracking-widest text-flare">Tiket {ticket.seq} dari {total}</span>
-        <b className="text-lg font-black uppercase">{ticket.tierName}</b>
-        <span className="text-sm text-muted">{ticket.access}</span>
-        <span className="font-mono text-base font-bold tracking-wider">{ticket.code}</span>
-        <span className="text-xs text-muted">Atas nama {ticket.holderName}</span>
-        {used && <span className="text-xs font-bold text-emerald-300">Sudah dipakai masuk: {used}</span>}
-      </div>
-    </li>
-  );
-}
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -132,19 +112,32 @@ export default function OrderStatus({ initial }: { initial: OrderView }) {
 
       {order.status === 'PAID' && (
         <section className="grid gap-3 border-t border-line pt-4" aria-labelledby="eticket-title">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <h2 id="eticket-title" className="text-xl">E-tiket kamu</h2>
-            <span className="text-xs text-muted">1 QR = 1 orang · tunjukkan di gerbang</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="eticket-title" className="text-xl">E-tiket kamu</h2>
+              <span className="text-xs text-muted">{order.tickets.length} tiket · 1 QR = 1 orang</span>
+            </div>
+            {order.tickets.length > 0 && (
+              <a href={pdfUrl(order.code)} download className="btn btn-red px-4 py-3 text-xs">
+                <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true"><path d="M12 3a1 1 0 011 1v9.6l3.3-3.3a1 1 0 111.4 1.4l-5 5a1 1 0 01-1.4 0l-5-5a1 1 0 111.4-1.4l3.3 3.3V4a1 1 0 011-1zM5 19a1 1 0 100 2h14a1 1 0 100-2H5z" /></svg>
+                {order.tickets.length > 1 ? 'Download semua tiket (PDF)' : 'Download tiket (PDF)'}
+              </a>
+            )}
           </div>
           {order.tickets.length ? (
-            <ul className="m-0 grid list-none gap-3 p-0">
-              {order.tickets.map(t => <TicketCard key={t.code} ticket={t} total={order.tickets.length} />)}
+            <ul className="m-0 grid list-none gap-5 p-0">
+              {order.tickets.map(t => <ETicketCard key={t.code} order={order} ticket={t} />)}
             </ul>
           ) : (
             <p className="m-0 text-sm text-muted" role="status">Tiket sedang diterbitkan…</p>
           )}
           <div className="grid gap-2 rounded-[12px] border border-line bg-black p-3.5 text-sm">
-            {order.ticketsEmailedAt ? (
+            {order.emailDelivery === 'log' ? (
+              <span className="text-amber-300">
+                Mode development: email tidak benar-benar dikirim ke {order.buyerEmail}. Salinannya disimpan sebagai file
+                di server (apps/api/tmp/emails). Isi pengaturan SMTP supaya e-tiket terkirim.
+              </span>
+            ) : order.ticketsEmailedAt ? (
               <span>✉️ E-tiket sudah dikirim ke <b>{order.buyerEmail}</b> pada {dateTime(order.ticketsEmailedAt)}.</span>
             ) : order.ticketsEmailFailed ? (
               <span className="text-[#ffb3b3]">Email e-tiket ke {order.buyerEmail} belum berhasil terkirim. Coba kirim ulang.</span>

@@ -2,13 +2,15 @@
 import jsQR from 'jsqr';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
-import type { CheckInResult, GateInfo, GateStats } from '../lib/types';
+import type { AuthUser, CheckInResult, GateInfo, GateStats } from '../lib/types';
 
 const STORAGE = 'ss26-gate';
 const SAME_CODE_COOLDOWN = 4000; // ms: QR yang sama tidak diproses ulang selama ini
 const RESULT_MS = 2600;
 
+// pin kosong = memakai sesi akun petugas/penyelenggara (cookie), bukan PIN bersama
 type Session = { pin: string; gate: string; day: number };
+const gateApi = (s: Session) => api.gate(s.pin || undefined);
 
 const TONE: Record<CheckInResult['result'], { bg: string; title: string; freq: number }> = {
   ok: { bg: 'bg-emerald-600', title: 'Silakan masuk', freq: 880 },
@@ -39,7 +41,7 @@ function loadSession(): Session | null {
 
 /* ---------- login ---------- */
 
-function Login({ onLogin }: { onLogin: (s: Session, info: GateInfo) => void }) {
+function Login({ onLogin, user }: { onLogin: (s: Session, info: GateInfo) => void; user: AuthUser | null }) {
   const [pin, setPin] = useState('');
   const [gate, setGate] = useState('Gerbang A');
   const [error, setError] = useState('');
@@ -64,6 +66,14 @@ function Login({ onLogin }: { onLogin: (s: Session, info: GateInfo) => void }) {
         <span className="eyebrow">Khusus petugas</span>
         <h1 className="text-2xl">Scanner gerbang</h1>
       </div>
+      {user ? (
+        <p className="m-0 rounded-[10px] border border-amber-400/40 bg-amber-400/5 p-3 text-sm text-amber-200">
+          Akun <b>{user.email}</b> belum punya akses petugas gerbang. Minta penyelenggara menambahkanmu ke tim, atau pakai PIN di bawah.
+        </p>
+      ) : (
+        <a href="/masuk?next=%2Fgate" className="btn btn-red">Masuk dengan akun petugas</a>
+      )}
+      <div className="flex items-center gap-3 text-xs text-muted" aria-hidden="true"><span className="h-px flex-1 bg-line" />atau pakai PIN bersama<span className="h-px flex-1 bg-line" /></div>
       <label className="grid gap-1.5">
         <span className="font-mono text-[0.7rem] uppercase tracking-widest text-muted">PIN petugas</span>
         <input type="password" inputMode="text" autoComplete="current-password" required value={pin} onChange={e => setPin(e.target.value)}
@@ -75,14 +85,15 @@ function Login({ onLogin }: { onLogin: (s: Session, info: GateInfo) => void }) {
           className="rounded-[10px] border border-line bg-black px-3.5 py-3 font-semibold text-paper" />
       </label>
       {error && <p className="m-0 text-sm text-[#ffb3b3]" role="alert">{error}</p>}
-      <button type="submit" className="btn btn-red" disabled={busy}>{busy ? 'Memeriksa…' : 'Masuk'}</button>
+      <button type="submit" className="btn btn-ghost" disabled={busy}>{busy ? 'Memeriksa…' : 'Masuk dengan PIN'}</button>
     </form>
   );
 }
 
 /* ---------- scanner ---------- */
 
-export default function GateScanner() {
+export default function GateScanner({ user }: { user: AuthUser | null }) {
+  const isStaff = user?.role === 'STAFF' || user?.role === 'ORGANIZER';
   const [session, setSession] = useState<Session | null>(null);
   const [info, setInfo] = useState<GateInfo | null>(null);
   const [stats, setStats] = useState<GateStats | null>(null);
@@ -97,28 +108,35 @@ export default function GateScanner() {
   const busyRef = useRef(false);
   const lastRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
 
-  // pulihkan sesi petugas dari tab yang sama
+  // akun petugas/penyelenggara langsung masuk; selain itu pulihkan sesi PIN dari tab yang sama
   useEffect(() => {
     const saved = loadSession();
-    if (!saved) return;
-    api.gate(saved.pin).me().then(i => { setSession(saved); setInfo(i); }).catch(() => sessionStorage.removeItem(STORAGE));
-  }, []);
+    if (isStaff) {
+      api.gate().me().then(i => {
+        setSession({ pin: '', gate: saved?.gate ?? 'Gerbang A', day: saved?.day ?? i.today ?? i.days[0].day });
+        setInfo(i);
+      }).catch(() => {});
+      return;
+    }
+    if (!saved?.pin) return;
+    gateApi(saved).me().then(i => { setSession(saved); setInfo(i); }).catch(() => sessionStorage.removeItem(STORAGE));
+  }, [isStaff]);
 
   useEffect(() => {
     if (!session) return;
     try { sessionStorage.setItem(STORAGE, JSON.stringify(session)); } catch {}
-    api.gate(session.pin).stats().then(setStats).catch(() => {});
+    gateApi(session).stats().then(setStats).catch(() => {});
   }, [session]);
 
   const submitCode = useCallback(async (text: string) => {
     if (!session || busyRef.current) return;
     busyRef.current = true;
     try {
-      const r = await api.gate(session.pin).checkIn(text, session.day, session.gate);
+      const r = await gateApi(session).checkIn(text, session.day, session.gate);
       setResult(r);
       setHistory(h => [{ ...r, at: new Date() }, ...h].slice(0, 8));
       feedback(r.result);
-      api.gate(session.pin).stats().then(setStats).catch(() => {});
+      gateApi(session).stats().then(setStats).catch(() => {});
     } catch (err) {
       setResult({ result: 'invalid', day: session.day, message: (err as Error).message });
       feedback('invalid');
@@ -190,7 +208,8 @@ export default function GateScanner() {
   };
 
   if (!session || !info) {
-    return <Login onLogin={(s, i) => { setSession(s); setInfo(i); }} />;
+    if (isStaff) return <p className="m-0 text-center text-muted" role="status">Membuka scanner…</p>;
+    return <Login user={user} onLogin={(s, i) => { setSession(s); setInfo(i); }} />;
   }
 
   const dayLabel = info.days.find(d => d.day === session.day)?.label ?? `Hari ${session.day}`;
@@ -199,11 +218,17 @@ export default function GateScanner() {
   return (
     <div className="mx-auto grid w-full max-w-[560px] gap-4">
       <header className="card flex flex-wrap items-center justify-between gap-3 rounded-[14px] p-4">
-        <div className="min-w-0">
-          <span className="eyebrow">{session.gate}</span>
-          <div className="text-sm text-muted">{info.event}</div>
+        <div className="grid min-w-0 flex-1 gap-1">
+          <label className="flex items-center gap-2">
+            <span className="eyebrow">Gerbang</span>
+            <input value={session.gate} maxLength={40} aria-label="Nama gerbang" onChange={e => setSession({ ...session, gate: e.target.value })}
+              className="min-w-0 flex-1 rounded-md border border-line bg-black px-2 py-1 text-sm font-bold text-paper" />
+          </label>
+          <div className="text-sm text-muted">{info.staff ? `${info.staff.name} · ${info.staff.role === 'ORGANIZER' ? 'Penyelenggara' : 'Petugas'}` : 'Masuk dengan PIN bersama'}</div>
         </div>
-        <button type="button" className="btn btn-ghost px-3 py-2 text-xs" onClick={logout}>Keluar</button>
+        {session.pin
+          ? <button type="button" className="btn btn-ghost px-3 py-2 text-xs" onClick={logout}>Keluar</button>
+          : <a href={user?.role === 'ORGANIZER' ? '/dashboard' : '/akun'} className="btn btn-ghost px-3 py-2 text-xs">{user?.role === 'ORGANIZER' ? 'Dasbor' : 'Akun'}</a>}
         <div className="flex w-full gap-1 rounded-xl border border-line bg-black p-1" role="radiogroup" aria-label="Hari festival">
           {info.days.map(d => (
             <button key={d.day} type="button" role="radio" aria-checked={session.day === d.day}

@@ -19,8 +19,10 @@ import Signup from '../components/Signup.tsx';
 import CartDrawer from '../components/CartDrawer.tsx';
 import { API_URL } from 'astro:env/server';
 import { createApi } from '../lib/api';
+import { getUser } from '../lib/session';
 import type { Festival } from '../lib/types';
 
+const user = await getUser(Astro);
 let festival: Festival | null = null;
 let error = '';
 try {
@@ -36,12 +38,12 @@ const redBand = 'bg-linear-to-b from-ink via-[#0c0000] to-ink';
 
 <Layout>
   <Silhouettes />
-  <Header />
+  <Header user={user} />
   <Hero />
 
   {festival ? (
     <>
-      <CartDrawer client:load tiers={festival.tiers} />
+      <CartDrawer client:load tiers={festival.tiers} user={user} />
       <Cities cities={festival.cities} />
 
       <section class="bg-linear-to-b from-ink via-[#0d0000] to-ink py-[clamp(40px,6vw,70px)]" aria-label="Lagu dari lineup">

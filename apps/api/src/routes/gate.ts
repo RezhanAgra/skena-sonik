@@ -7,30 +7,38 @@ import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { prisma } from '../db.ts';
-import { OrderStatus } from '../generated/prisma/client.ts';
+import { OrderStatus, Role } from '../generated/prisma/client.ts';
 import { EVENT, EVENT_DAYS, todayEventDay } from '../lib/event.ts';
 import { checkIn } from '../lib/tickets.ts';
 
+// Akses gerbang: akun STAFF/ORGANIZER yang sedang masuk, atau PIN bersama GATE_TOKEN (opsional)
 const requireGateToken: RequestHandler = (req, res, next) => {
-  if (!config.GATE_TOKEN) {
-    res.status(503).json({ error: 'Scanner gerbang belum diaktifkan. Isi GATE_TOKEN di konfigurasi API.' });
-    return;
-  }
-  const given = Buffer.from((req.headers.authorization ?? '').replace(/^Bearer\s+/i, ''));
-  const expected = Buffer.from(config.GATE_TOKEN);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+  const user = res.locals.user;
+  if (user && (user.role === Role.STAFF || user.role === Role.ORGANIZER)) return next();
+
+  const header = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+  if (header && config.GATE_TOKEN) {
+    const given = Buffer.from(header);
+    const expected = Buffer.from(config.GATE_TOKEN);
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return next();
     res.status(401).json({ error: 'PIN petugas salah.' });
     return;
   }
-  next();
+  if (user) {
+    res.status(403).json({ error: 'Akunmu belum punya akses petugas gerbang. Minta penyelenggara menambahkanmu ke tim.' });
+    return;
+  }
+  res.status(401).json({ error: 'Masuk dengan akun petugas atau penyelenggara untuk membuka scanner.' });
 };
 
 export const gateRouter = Router();
 gateRouter.use(requireGateToken);
 
 gateRouter.get('/me', (_req, res) => {
+  const user = res.locals.user;
   res.json({
     ok: true,
+    staff: user ? { name: user.name, role: user.role } : null,
     event: EVENT.name,
     today: todayEventDay(),
     days: EVENT_DAYS.map(d => ({ day: d, label: EVENT.days[d].label }))
@@ -45,7 +53,8 @@ const CheckInInput = z.object({
 
 gateRouter.post('/check-in', async (req, res) => {
   const { qr, day, gate } = CheckInInput.parse(req.body);
-  const result = await checkIn(qr, day, gate || null);
+  // nama gerbang dari form; kalau kosong, pakai nama petugas yang masuk
+  const result = await checkIn(qr, day, gate || res.locals.user?.name || null);
   console.log(`[gate] ${gate ?? '-'} hari ${day}: ${result.result} ${result.ticket?.code ?? ''}`);
   res.json(result);
 });

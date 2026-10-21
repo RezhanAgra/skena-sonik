@@ -4,7 +4,8 @@ import path from 'node:path';
 import nodemailer from 'nodemailer';
 import { config } from '../../config.ts';
 
-export interface MailAttachment { filename: string; content: Buffer; cid: string; contentType: string }
+// cid diisi untuk gambar inline (dipakai <img src="cid:...">); tanpa cid = lampiran biasa (mis. PDF)
+export interface MailAttachment { filename: string; content: Buffer; cid?: string; contentType: string }
 export interface Mail { to: string; subject: string; html: string; text: string; attachments?: MailAttachment[] }
 
 const LOG_DIR = path.resolve('tmp/emails');
@@ -28,11 +29,13 @@ export async function sendMail(mail: Mail): Promise<{ id: string; preview?: stri
 
   // mode log: gambar cid: diganti data URI supaya file HTML bisa dibuka langsung di browser
   let html = mail.html;
-  for (const a of mail.attachments ?? []) {
-    html = html.replaceAll(`cid:${a.cid}`, `data:${a.contentType};base64,${a.content.toString('base64')}`);
-  }
   await mkdir(LOG_DIR, { recursive: true });
-  const file = path.join(LOG_DIR, `${new Date().toISOString().replace(/[:.]/g, '-')}-${mail.to.replace(/[^a-z0-9@.]/gi, '_')}.html`);
+  const stamp = `${new Date().toISOString().replace(/[:.]/g, '-')}-${mail.to.replace(/[^a-z0-9@.]/gi, '_')}`;
+  for (const a of mail.attachments ?? []) {
+    if (a.cid) html = html.replaceAll(`cid:${a.cid}`, `data:${a.contentType};base64,${a.content.toString('base64')}`);
+    else await writeFile(path.join(LOG_DIR, `${stamp}-${a.filename}`), a.content); // lampiran disimpan di sebelah HTML
+  }
+  const file = path.join(LOG_DIR, `${stamp}.html`);
   await writeFile(file, `<!-- To: ${mail.to} | Subject: ${mail.subject} -->\n${html}`);
   console.log(`[email:log] "${mail.subject}" → ${mail.to} disimpan di ${file}`);
   return { id: path.basename(file), preview: file };

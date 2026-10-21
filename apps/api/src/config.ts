@@ -32,8 +32,13 @@ const Env = z.object({
 
   // kunci rahasia untuk menandatangani QR e-tiket. Ganti dengan string acak panjang di produksi.
   TICKET_SECRET: z.string().min(32, 'TICKET_SECRET minimal 32 karakter.').default('dev-only-ticket-secret-ganti-di-produksi!!'),
-  // PIN/token petugas gerbang untuk halaman /gate. Kosong = scanner gerbang nonaktif.
+  // PIN bersama untuk halaman /gate (opsional). Petugas juga bisa masuk pakai akun STAFF/ORGANIZER.
   GATE_TOKEN: z.string().min(6, 'GATE_TOKEN minimal 6 karakter.').optional(),
+
+  // email yang otomatis jadi penyelenggara (ORGANIZER) setelah emailnya terverifikasi, pisahkan dengan koma
+  ORGANIZER_EMAILS: z.string().optional(),
+  // lama sesi login (hari)
+  SESSION_DAYS: z.coerce.number().int().positive().default(30),
 
   // log = email tidak dikirim, disimpan sebagai file HTML di apps/api/tmp/emails (development)
   // smtp = kirim lewat SMTP (mis. Gmail dengan App Password)
@@ -41,7 +46,8 @@ const Env = z.object({
   SMTP_HOST: z.string().default('smtp.gmail.com'),
   SMTP_PORT: z.coerce.number().int().positive().default(465),
   SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
+  // App Password Gmail ditampilkan berkelompok "abcd efgh ijkl mnop"; spasinya bukan bagian dari password
+  SMTP_PASS: z.string().transform(s => s.replace(/\s+/g, '')).optional(),
   // pengirim, contoh: "Skena Sonik <skenasonik.tiket@gmail.com>". Default: SMTP_USER
   EMAIL_FROM: z.string().optional()
 }).superRefine((env, ctx) => {
@@ -75,5 +81,8 @@ export const config = {
   ...parsed.data,
   PORT: parsed.data.API_PORT ?? (parsed.data.NODE_ENV === 'production' ? parsed.data.PORT : undefined) ?? 4000,
   corsOrigins: parsed.data.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
+  organizerEmails: new Set(parsed.data.ORGANIZER_EMAILS?.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) ?? []),
+  siteOrigin: new URL(parsed.data.SITE_URL).origin,
+  secureCookies: parsed.data.SITE_URL.startsWith('https://'),
   isProduction: parsed.data.NODE_ENV === 'production'
 };

@@ -1,5 +1,9 @@
 ---
 import CartButton from './CartButton.tsx';
+import type { AuthUser } from '../lib/types';
+
+interface Props { user?: AuthUser | null }
+const { user = null } = Astro.props;
 
 const socials = [
   {
@@ -42,7 +46,17 @@ const menu = [
         <small class="font-mono text-[0.58rem] tracking-[0.3em] text-muted">TOUR 2026</small>
       </a>
 
-      <CartButton client:load />
+      <div class="flex items-center justify-self-end gap-1 sm:gap-2">
+        {user ? (
+          <a href={user.role === 'ORGANIZER' ? '/dashboard' : '/akun'} class="flex items-center gap-2 rounded-full border border-line py-1 pr-1 pl-3 text-xs font-bold text-paper no-underline hover:border-flare" aria-label={`Akun ${user.name}`}>
+            <span class="max-sm:hidden">{user.name.split(' ')[0]}</span>
+            <span class="grid size-7 place-items-center rounded-full bg-flare text-[0.8rem] font-black text-white" aria-hidden="true">{user.name.charAt(0).toUpperCase()}</span>
+          </a>
+        ) : (
+          <a href="/masuk?next=%2F" class="rounded-full border border-line px-3 py-1.5 text-xs font-bold text-paper no-underline hover:border-flare hover:bg-flare">Masuk</a>
+        )}
+        <CartButton client:load />
+      </div>
 
       <nav class="col-span-full" aria-label="Utama">
         <ul class="m-0 flex list-none flex-wrap justify-center gap-3.5 p-0 text-xs font-bold sm:gap-5 sm:text-sm">

@@ -1,0 +1,24 @@
+---
+// Kerangka halaman akun: logo + kartu di tengah, latar asap merah
+import Layout from '../../layouts/Layout.astro';
+
+interface Props { title: string; eyebrow?: string; lede?: string }
+const { title, eyebrow, lede } = Astro.props;
+---
+
+<Layout title={`${title} · Skena Sonik`} noindex>
+  <main class="smoke relative grid min-h-dvh place-items-center overflow-hidden py-10">
+    <div class="wrap relative z-10 grid w-full justify-items-center gap-6">
+      <a href="/" class="logo-type text-4xl no-underline">Skena Sonik</a>
+      <section class="card grid w-full max-w-[440px] gap-5 rounded-[18px] p-6 shadow-[0_0_60px_rgb(255_31_31/0.2)] sm:p-7">
+        <div class="grid gap-2">
+          {eyebrow && <span class="eyebrow">{eyebrow}</span>}
+          <h1 class="text-[1.7rem]">{title}</h1>
+          {lede && <p class="m-0 text-sm text-muted">{lede}</p>}
+        </div>
+        <slot />
+      </section>
+      <slot name="after" />
+    </div>
+  </main>
+</Layout>

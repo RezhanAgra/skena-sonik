@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { rupiah } from '../lib/format';
 import { paySnap } from '../lib/snap';
-import type { Buyer, CartQuote, Tier } from '../lib/types';
+import type { AuthUser, Buyer, CartQuote, Tier } from '../lib/types';
 import {
   $cartOpen, MAX_TICKETS, clearCart, closeCart, rememberOrder, removeFromCart, setQuantity, useCart
 } from '../stores/cart';
@@ -13,14 +13,15 @@ type Step = 'cart' | 'buyer';
 
 const inputClass = 'w-full min-w-0 rounded-[10px] border border-line bg-black px-3.5 py-3 font-semibold text-paper placeholder:text-muted/70 focus:border-flare';
 
-export default function CartDrawer({ tiers }: { tiers: Tier[] }) {
+export default function CartDrawer({ tiers, user }: { tiers: Tier[]; user: AuthUser | null }) {
   const open = useStore($cartOpen);
   const items = useCart();
   const [step, setStep] = useState<Step>('cart');
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [buyer, setBuyer] = useState<Buyer>({ name: '', email: '', phone: '' });
+  // penonton yang sudah masuk: data pembeli terisi otomatis dari akun (tetap bisa diubah)
+  const [buyer, setBuyer] = useState<Buyer>({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '' });
   const panelRef = useRef<HTMLDivElement>(null);
   const tierBySlug = Object.fromEntries(tiers.map(t => [t.slug, t]));
   const count = items.reduce((n, i) => n + i.quantity, 0);
@@ -164,7 +165,14 @@ export default function CartDrawer({ tiers }: { tiers: Tier[] }) {
         ) : (
           <form onSubmit={pay} className="flex flex-1 flex-col overflow-hidden">
             <div className="grid flex-1 content-start gap-4 overflow-y-auto p-5">
-              <p className="m-0 text-sm text-muted">Bukti pembelian dan kode pesanan dikaitkan ke data ini. Pastikan email dan nomor HP aktif.</p>
+              <p className="m-0 text-sm text-muted">E-tiket dikirim ke email ini. Pastikan email dan nomor HP aktif.</p>
+              {user ? (
+                <p className="m-0 rounded-[10px] border border-emerald-400/30 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200">Masuk sebagai {user.email}. Pesanan ini otomatis tersimpan di <b>Tiket saya</b>.</p>
+              ) : (
+                <p className="m-0 rounded-[10px] border border-line bg-black px-3 py-2 text-xs text-muted">
+                  Punya akun? <a href="/masuk?next=%2F%23tiket" className="font-bold text-paper">Masuk</a> supaya data terisi otomatis dan tiket tersimpan di akunmu. Tanpa akun juga bisa.
+                </p>
+              )}
               {([
                 { id: 'buyer-name', key: 'name', label: 'Nama lengkap', type: 'text', auto: 'name', placeholder: 'Sesuai KTP' },
                 { id: 'buyer-email', key: 'email', label: 'Email', type: 'email', auto: 'email', placeholder: 'kamu@email.com' },

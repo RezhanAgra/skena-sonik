@@ -1,0 +1,12 @@
+---
+import AuthShell from '../components/auth/AuthShell.astro';
+import { RegisterForm } from '../components/auth/AuthForms.tsx';
+import { getUser, safeNext } from '../lib/session';
+
+const next = safeNext(Astro.url.searchParams.get('next'));
+if (await getUser(Astro)) return Astro.redirect(next);
+---
+
+<AuthShell title="Buat akun" eyebrow="Gratis" lede="Simpan semua tiketmu di satu tempat dan checkout lebih cepat.">
+  <RegisterForm client:load next={next} />
+</AuthShell>
