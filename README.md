@@ -1,8 +1,8 @@
 # Skena Sonik Tour 2026
 
-Web tur konser bergaya poster merah-hitam, dibangun dengan **Astro + React + Tailwind CSS** di frontend dan **Express + Prisma + PostgreSQL** di backend (PERN). Database di **Supabase**, deploy ke **VPS dengan Docker**.
+Web tour konser bergaya poster merah-hitam, dibangun dengan **Astro + React + Tailwind CSS** di frontend dan **Express + Prisma + PostgreSQL** di backend (PERN). Database di **Supabase**, deploy ke **VPS dengan Docker**.
 
-> Mockup desain: acara, harga, kota, dan tanggal fiktif. Nama musisi hanya contoh lineup.
+
 
 ## Struktur
 
