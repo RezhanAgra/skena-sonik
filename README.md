@@ -30,7 +30,7 @@ apps/
     Dockerfile
   web/                    Astro 6 (SSR, adapter Node) + React 19 + Tailwind 4
     src/
-      pages/              index, pesanan/[code] (status + e-tiket), gate (scanner petugas), 404, robots.txt, sitemap.xml
+      pages/              index, pesanan/[code], akun, dashboard, gate, gelang (booth), masuk/daftar/..., 404, robots.txt, sitemap.xml
       layouts/            <head>, SEO & Open Graph, font
       components/         *.astro = statis, *.tsx = island interaktif
       stores/             state bersama antar island (nanostores)
@@ -227,6 +227,40 @@ Gmail biasa dibatasi sekitar **500 email per hari**. Untuk penjualan besar, gant
 
 Saat development, `EMAIL_PROVIDER=log` tidak mengirim apa pun. Setiap email disimpan sebagai file HTML di `apps/api/tmp/emails/` supaya bisa dibuka di browser.
 
+## Akun: penonton, petugas, penyelenggara
+
+| Peran | Bisa apa | Cara dapat |
+| --- | --- | --- |
+| Penonton | `/akun`: Tiket saya, profil, ganti password; checkout terisi otomatis | daftar di `/daftar` |
+| Petugas gerbang | + scanner `/gate` tanpa PIN | ditambahkan penyelenggara di Dasbor → Tim |
+| Penyelenggara | + `/dashboard`: penjualan, pesanan, kirim ulang e-tiket, kelola tim | email ada di `ORGANIZER_EMAILS` |
+
+**Membuat akun penyelenggara pertama** (tidak ada akun/password bawaan):
+1. Isi `ORGANIZER_EMAILS=emailmu@gmail.com` di `apps/api/.env` (atau `.env` root untuk Docker), lalu restart API.
+2. Daftar di `/daftar` dengan email itu dan password pilihanmu.
+3. Klik link verifikasi yang dikirim ke email itu. Akun otomatis menjadi penyelenggara, lalu buka `/dashboard`.
+
+Pesanan yang dibeli tanpa login muncul di **Tiket saya** setelah email akun yang sama diverifikasi. Lupa password: `/lupa-password` (link berlaku 1 jam).
+
+## Penukaran gelang (booth)
+
+Di hari acara, penonton menukar e-tiket dengan **gelang fisik** di booth penukaran. Gelang inilah yang dipakai untuk masuk.
+
+1. Petugas (akun **STAFF** atau **ORGANIZER**) membuka `/gelang`, mengisi nama booth, hari, dan jenis printer.
+2. QR e-tiket dipindai dengan kamera (atau kodenya diketik), lalu sistem mengecek pesanan lunas dan status penukaran tiket.
+3. Petugas klik **Cetak gelang**. Dialog cetak terbuka dengan ukuran:
+   - **Gelang thermal 25,4 × 254 mm** (printer gelang seperti Zebra/TSC; atur driver ke ukuran ini), atau
+   - **Kertas A4 landscape** berwarna, untuk digunting.
+4. Gelang berisi jenis tiket, nama, hari berlaku, **QR gelang** (bertanda tangan HMAC), dan kode `WB-XXXX-XXXX`.
+   Warna per jenis tiket (stok gelang yang dipasang di printer): 2-Day **Merah**, Daily **Kuning**, Pit **Ungu**, Early Bird **Biru**. Warnanya diatur di `apps/web/src/components/wristband/WristbandPrint.tsx`.
+
+Aturan:
+- **Satu tiket, satu gelang aktif.** E-tiket yang sudah ditukar tidak bisa ditukar lagi.
+- **Cetak ulang** (gelang rusak/hilang) wajib disertai alasan. Gelang lama otomatis **tidak berlaku** di gerbang.
+- **Daily Pass:** gelang hanya berlaku di hari penukaran. **2-Day/Pit:** berlaku Sabtu & Minggu.
+- Di `/gate`, QR gelang dan QR e-tiket sama-sama bisa dipindai, dengan aturan 1× masuk per hari.
+- Dua booth yang memindai tiket yang sama bersamaan tidak bisa mencetak dua gelang, karena baris tiket dikunci di database.
+
 ## Environment variable
 
 | Variabel | Dipakai | Keterangan |
@@ -248,6 +282,8 @@ Saat development, `EMAIL_PROVIDER=log` tidak mengirim apa pun. Setiap email disi
 | `EMAIL_PROVIDER` | api | `smtp` (kirim sungguhan) atau `log` (simpan file HTML) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | api | akun pengirim email e-tiket |
 | `DATABASE_POOL_MAX` | api | koneksi database maksimum per proses (default 10) |
+| `ORGANIZER_EMAILS` | api | email penyelenggara (aktif setelah email diverifikasi) |
+| `SESSION_DAYS` | api | lama sesi login, default 30 hari |
 | `DOMAIN`, `ACME_EMAIL` | docker-compose | domain situs dan email sertifikat HTTPS |
 
 ## API
@@ -266,6 +302,9 @@ Saat development, `EMAIL_PROVIDER=log` tidak mengirim apa pun. Setiap email disi
 | GET | `/api/orders/:code/tickets.pdf` | download PDF e-tiket (semua, atau `?ticket=TKT-…` untuk satu) | 60/menit |
 | GET | `/api/gate/me` | cek PIN petugas (header `Authorization: Bearer GATE_TOKEN`) | 600/menit |
 | POST | `/api/gate/check-in` | check-in tiket `{ qr, day, gate }` | 600/menit |
+| POST | `/api/wristbands/lookup` | cek e-tiket di booth `{ qr }` (STAFF/ORGANIZER) | 600/menit |
+| POST | `/api/wristbands` | terbitkan / cetak ulang gelang `{ ticketCode, day, booth?, reprint?, reason? }` | 600/menit |
+| GET | `/api/wristbands/stats` | jumlah gelang aktif & cetak ulang | 600/menit |
 | GET | `/api/gate/stats` | jumlah tiket terbit & yang sudah masuk per hari | 600/menit |
 | POST | `/api/subscribers` | daftar info presale `{ email }` | 5/menit |
 

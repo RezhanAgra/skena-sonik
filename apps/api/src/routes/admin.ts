@@ -19,7 +19,7 @@ adminRouter.get('/stats', async (_req, res) => {
   const since = new Date(Date.now() - 13 * 86_400_000);
   since.setHours(0, 0, 0, 0);
 
-  const [byStatus, revenue, perTier, tickets, checkIns, paidRecent, users] = await Promise.all([
+  const [byStatus, revenue, perTier, tickets, checkIns, paidRecent, users, wristbands] = await Promise.all([
     prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.order.aggregate({ where: { status: OrderStatus.PAID }, _sum: { total: true, fee: true } }),
     prisma.orderItem.groupBy({
@@ -30,7 +30,8 @@ adminRouter.get('/stats', async (_req, res) => {
     prisma.ticket.count({ where: { order: { status: OrderStatus.PAID } } }),
     prisma.ticketCheckIn.groupBy({ by: ['day'], _count: { _all: true } }),
     prisma.order.findMany({ where: { status: OrderStatus.PAID, paidAt: { gte: since } }, select: { paidAt: true, total: true } }),
-    prisma.user.groupBy({ by: ['role'], _count: { _all: true } })
+    prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
+    prisma.wristband.count({ where: { voidedAt: null } })
   ]);
 
   // penjualan per hari (14 hari terakhir, zona waktu Jakarta)
@@ -49,6 +50,7 @@ adminRouter.get('/stats', async (_req, res) => {
     serviceFees: revenue._sum.fee ?? 0,
     orders: Object.fromEntries(Object.values(OrderStatus).map(s => [s, byStatus.find(b => b.status === s)?._count._all ?? 0])),
     ticketsIssued: tickets,
+    wristbandsIssued: wristbands,
     perTier: perTier.map(t => ({ tier: t.tierSlug, name: t.tierName, sold: t._sum.quantity ?? 0, revenue: t._sum.subtotal ?? 0 })),
     checkIns: EVENT_DAYS.map(d => ({ day: d, label: EVENT.days[d].label, count: checkIns.find(c => c.day === d)?._count._all ?? 0 })),
     daily,

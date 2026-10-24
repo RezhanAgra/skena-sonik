@@ -3,7 +3,7 @@
 //   meneruskannya ke container API; di dev, proxy Vite (astro.config.mjs) yang meneruskan.
 //   PUBLIC_API_URL hanya perlu diisi kalau API sengaja di-host di domain lain (perlu CORS_ORIGIN di API).
 // - Server (SSR): buat client sendiri dengan API_URL dari `astro:env/server` (dibaca saat runtime).
-import type { AdminOrderPage, AdminStats, AuthUser, Buyer, CartItem, CartQuote, CheckInResult, CheckoutResult, Festival, GateInfo, GateStats, MyOrders, OrderView, Quote, Role, TeamMember } from './types';
+import type { AdminOrderPage, AdminStats, AuthUser, BoothTicket, WristbandView, Buyer, CartItem, CartQuote, CheckInResult, CheckoutResult, Festival, GateInfo, GateStats, MyOrders, OrderView, Quote, Role, TeamMember } from './types';
 
 export class ApiError extends Error {}
 
@@ -63,6 +63,11 @@ export function createApi(base: string, extraHeaders: Record<string, string> = {
       resetPassword: (token: string, password: string) => post<{ user: AuthUser }>('/api/auth/reset-password', { token, password })
     },
     myOrders: () => request<MyOrders>('/api/me/orders'),
+    wristbands: {
+      lookup: (qr: string) => post<BoothTicket>('/api/wristbands/lookup', { qr }),
+      issue: (input: { ticketCode: string; day: number; booth?: string; reprint?: boolean; reason?: string }) => post<WristbandView>('/api/wristbands', input),
+      stats: () => request<{ issued: number; reprinted: number; tickets: number }>('/api/wristbands/stats')
+    },
     admin: {
       stats: () => request<AdminStats>('/api/admin/stats'),
       orders: (params: { q?: string; status?: string; page?: number }) =>

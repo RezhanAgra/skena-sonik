@@ -56,7 +56,13 @@ export const loadUser: RequestHandler = async (req, res, next) => {
     res.clearCookie(SESSION_COOKIE, { ...cookieOptions(0), maxAge: undefined });
     return next();
   }
-  res.locals.user = session.user;
+  let user = session.user;
+  // email di ORGANIZER_EMAILS (dan sudah terverifikasi) langsung jadi penyelenggara, tanpa perlu masuk ulang
+  if (user.emailVerifiedAt && user.role !== Role.ORGANIZER && config.organizerEmails.has(user.email)) {
+    user = await prisma.user.update({ where: { id: user.id }, data: { role: Role.ORGANIZER }, select: USER_SELECT });
+    console.log(`Akun ${user.email} dijadikan ORGANIZER (ORGANIZER_EMAILS).`);
+  }
+  res.locals.user = user;
   res.locals.sessionId = session.id;
   next();
 };

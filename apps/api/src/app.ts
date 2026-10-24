@@ -12,6 +12,7 @@ import { ticketsRouter } from './routes/tickets.ts';
 import { cartRouter, checkoutRouter, ordersRouter, paymentsRouter } from './routes/checkout.ts';
 import { subscribersRouter } from './routes/subscribers.ts';
 import { gateRouter } from './routes/gate.ts';
+import { wristbandsRouter } from './routes/wristbands.ts';
 import { authRouter } from './routes/auth.ts';
 import { accountRouter } from './routes/account.ts';
 import { adminRouter } from './routes/admin.ts';
@@ -64,6 +65,7 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/subscribers', limiter(5), subscribersRouter);
 // scanner gerbang bisa memindai ratusan tiket per menit, jadi batasnya longgar
 app.use('/api/gate', limiter(600), gateRouter);
+app.use('/api/wristbands', limiter(600), wristbandsRouter);
 app.use('/api/auth', limiter(60), authRouter);
 app.use('/api/me', limiter(60), accountRouter);
 app.use('/api/admin', limiter(120), adminRouter);

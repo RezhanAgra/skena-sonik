@@ -1,0 +1,28 @@
+---
+// Booth penukaran e-tiket → gelang (akun petugas gerbang atau penyelenggara)
+import Layout from '../layouts/Layout.astro';
+import WristbandStation from '../components/wristband/WristbandStation.tsx';
+import { requireUser } from '../lib/session';
+
+const { user, redirect, forbidden } = await requireUser(Astro, ['STAFF', 'ORGANIZER']);
+if (redirect) return redirect;
+Astro.response.headers.set('Cache-Control', 'no-store');
+if (forbidden) Astro.response.status = 403;
+---
+
+<Layout title="Penukaran gelang · Skena Sonik" noindex>
+  <main class="min-h-dvh bg-ink py-6 sm:py-10 print:bg-white print:p-0">
+    <div class="wrap grid gap-5 print:block print:p-0">
+      <a href="/" class="logo-type justify-self-center text-3xl no-underline print:hidden">Skena Sonik</a>
+      {forbidden ? (
+        <section class="card mx-auto grid max-w-[480px] justify-items-center gap-4 rounded-[18px] p-8 text-center">
+          <h1 class="text-2xl">Khusus petugas</h1>
+          <p class="lede">Akun <b class="text-paper">{user!.email}</b> belum punya akses booth. Minta penyelenggara menambahkanmu sebagai petugas di Dasbor → Tim.</p>
+          <a class="btn btn-white" href="/akun">Ke akun saya</a>
+        </section>
+      ) : (
+        <WristbandStation client:only="react" user={user!} />
+      )}
+    </div>
+  </main>
+</Layout>

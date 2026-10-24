@@ -124,7 +124,7 @@ function Overview() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Pendapatan" value={rupiah(stats.revenue)} hint={`termasuk biaya layanan ${shortRp(stats.serviceFees)}`} />
         <Tile label="Pesanan lunas" value={String(stats.orders.PAID)} hint={`${stats.orders.PENDING} menunggu bayar`} />
-        <Tile label="Tiket terbit" value={String(stats.ticketsIssued)} hint="1 tiket = 1 orang" />
+        <Tile label="Tiket terbit" value={String(stats.ticketsIssued)} hint={`${stats.wristbandsIssued} sudah ditukar gelang`} />
         <Tile label="Sudah masuk" value={String(totalCheckIns)} hint={stats.checkIns.map(c => `${c.label.split(',')[0]} ${c.count}`).join(' · ')} />
       </div>
 
@@ -319,6 +319,7 @@ export default function Dashboard({ me }: { me: AuthUser }) {
           <p className="m-0 text-sm text-muted">Masuk sebagai {me.name} ({me.email})</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a href="/gelang" className="btn btn-ghost px-4 py-3 text-xs">Penukaran gelang</a>
           <a href="/gate" className="btn btn-ghost px-4 py-3 text-xs">Scanner gerbang</a>
           <a href="/akun" className="btn btn-ghost px-4 py-3 text-xs">Akun saya</a>
         </div>
