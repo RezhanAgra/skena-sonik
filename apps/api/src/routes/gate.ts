@@ -12,7 +12,7 @@ import { EVENT, EVENT_DAYS, todayEventDay } from '../lib/event.ts';
 import { checkIn } from '../lib/tickets.ts';
 
 // Akses gerbang: akun STAFF/ORGANIZER yang sedang masuk, atau PIN bersama GATE_TOKEN (opsional)
-const requireGateToken: RequestHandler = (req, res, next) => {
+export const requireGateToken: RequestHandler = (req, res, next) => {
   const user = res.locals.user;
   if (user && (user.role === Role.STAFF || user.role === Role.ORGANIZER)) return next();
 

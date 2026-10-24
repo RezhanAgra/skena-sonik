@@ -111,6 +111,7 @@ export default function AccountPage({ initialUser, justReset }: { initialUser: A
         </div>
         <div className="flex flex-wrap gap-2">
           {user.role === 'ORGANIZER' && <a href="/dashboard" className="btn btn-red px-4 py-3 text-xs">Dasbor penyelenggara</a>}
+          {(user.role === 'STAFF' || user.role === 'ORGANIZER') && <a href="/gelang" className="btn btn-ghost px-4 py-3 text-xs">Penukaran gelang</a>}
           {(user.role === 'STAFF' || user.role === 'ORGANIZER') && <a href="/gate" className="btn btn-ghost px-4 py-3 text-xs">Scanner gerbang</a>}
           <button type="button" className="btn btn-ghost px-4 py-3 text-xs" onClick={logout}>Keluar</button>
         </div>

@@ -170,6 +170,7 @@ export interface AdminStats {
   serviceFees: number;
   orders: Record<OrderStatus, number>;
   ticketsIssued: number;
+  wristbandsIssued: number;
   perTier: { tier: string; name: string; sold: number; revenue: number }[];
   checkIns: { day: number; label: string; count: number }[];
   daily: { date: string; revenue: number; orders: number }[];
@@ -195,3 +196,36 @@ export interface AdminOrder {
 export interface AdminOrderPage { page: number; pageSize: number; total: number; orders: AdminOrder[] }
 
 export interface TeamMember { id: number; name: string; email: string; role: Role; emailVerified: boolean; createdAt: string }
+
+/* ---------- gelang ---------- */
+
+export interface WristbandView {
+  code: string;
+  validDays: number[];
+  validLabel: string;
+  validDates: string;
+  createdAt: string;
+  issuedByName: string | null;
+  reprintOf: string | null;
+  tierSlug: string;
+  tierName: string;
+  holderName: string;
+  ticketCode: string;
+  qrSvg: string;
+}
+
+export interface BoothTicket {
+  code: string;
+  tierSlug: string;
+  tierName: string;
+  holderName: string;
+  seq: number;
+  totalInOrder: number;
+  orderCode: string;
+  orderStatus: OrderStatus;
+  access: string;
+  daysAccess: number;
+  checkIns: { day: number; at: string }[];
+  activeWristband: WristbandView | null;
+  history: { code: string; createdAt: string; voidedAt: string | null; reason: string | null; issuedByName: string | null; booth: string | null }[];
+}

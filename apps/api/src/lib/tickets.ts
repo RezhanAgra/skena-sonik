@@ -5,6 +5,7 @@ import { config } from '../config.ts';
 import { prisma } from '../db.ts';
 import { OrderStatus } from '../generated/prisma/client.ts';
 import { EVENT, EVENT_DAYS } from './event.ts';
+import { resolveWristband } from './wristbands.ts';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const randomChars = (n: number) => [...randomBytes(n)].map(b => ALPHABET[b % ALPHABET.length]).join('');
@@ -26,6 +27,13 @@ export function verifyQrPayload(text: string): string | null {
   const expected = Buffer.from(sign(code));
   const given = Buffer.from(sig);
   return expected.length === given.length && timingSafeEqual(expected, given) ? code : null;
+}
+
+/** Kode tiket dari isi QR e-tiket atau kode yang diketik petugas (TKT-XXXX-XXXX), null kalau bukan e-tiket */
+export function ticketCodeFromInput(text: string) {
+  const typed = text.trim().toUpperCase();
+  if (/^TKT-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(typed)) return typed;
+  return verifyQrPayload(text);
 }
 
 const QR_OPTIONS = { errorCorrectionLevel: 'M' as const, margin: 2, color: { dark: '#050505', light: '#ffffff' } };
@@ -82,10 +90,18 @@ export interface GateTicket {
 export async function checkIn(qrText: string, day: number, gate: string | null): Promise<CheckInResult> {
   if (!EVENT_DAYS.includes(day)) return { result: 'invalid', day, message: 'Hari festival tidak valid.' };
 
-  // petugas juga boleh mengetik kode tiket (TKT-XXXX-XXXX) kalau QR rusak/tidak terbaca
-  const typed = /^TKT-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(qrText.trim().toUpperCase()) ? qrText.trim().toUpperCase() : null;
-  const code = typed ?? verifyQrPayload(qrText);
-  if (!code) return { result: 'invalid', day, message: 'QR tidak dikenal. Bukan e-tiket Skena Sonik atau sudah dimodifikasi.' };
+  // QR / kode gelang (hasil penukaran di booth) dipetakan ke tiketnya, dengan aturan hari gelang
+  let code: string | null = null;
+  const band = await resolveWristband(qrText);
+  if (band) {
+    if (band.voidedAt) return { result: 'invalid', day, message: `Gelang ${band.code} sudah dinonaktifkan (diganti gelang cetak ulang).` };
+    if (!band.validDays.includes(day)) {
+      return { result: 'wrong_day', day, message: `Gelang ${band.code} hanya berlaku ${band.validDays.map(d => EVENT.days[d]?.label.split(',')[0]).join(' & ')}.` };
+    }
+    code = band.ticket.code;
+  }
+  code ??= ticketCodeFromInput(qrText);
+  if (!code) return { result: 'invalid', day, message: 'QR tidak dikenal. Bukan e-tiket atau gelang Skena Sonik, atau sudah dimodifikasi.' };
 
   const ticket = await prisma.ticket.findUnique({
     where: { code },
